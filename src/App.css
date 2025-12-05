@@ -1,0 +1,95 @@
+:root {
+  color-scheme: dark;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: #020617;
+  color: #e2e8f0;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 20% 20%, #0b1533 0%, transparent 35%),
+    radial-gradient(circle at 80% 0%, #0b1533 0%, transparent 30%),
+    #020617;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.app__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0 0 6px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.lead {
+  margin: 8px 0 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.pill {
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 10px 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.pill__label {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.pill__value {
+  color: #e0f2fe;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.footer {
+  border-top: 1px solid #1f2937;
+  padding-top: 16px;
+  color: #94a3b8;
+}
+
+.footer ul {
+  padding-left: 16px;
+  margin: 8px 0 0;
+  color: #cbd5e1;
+}
+
+.footer li + li {
+  margin-top: 4px;
+}
+
+
