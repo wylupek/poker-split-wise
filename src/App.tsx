@@ -1,99 +1,136 @@
-import "./App.css";
-import { SectionCard } from "./components/SectionCard";
-import { GameConfig } from "./domain/types";
-import { DEFAULT_DENOMINATIONS, DEFAULT_MULTIPLIER } from "./domain/constants";
+import { useState } from 'react';
+import { useAppState } from './hooks/useAppState';
+import { PlayerManagement } from './components/PlayerManagement';
+import { SessionManager } from './components/SessionManager';
+import { BalanceView } from './components/BalanceView';
+import { SessionHistory } from './components/SessionHistory';
+import { Settings } from './components/Settings';
+import './App.css';
 
-const sampleConfig: GameConfig = {
-  players_count: 4,
-  player_ids: [],
-  multiplier: DEFAULT_MULTIPLIER,
-  denominations: DEFAULT_DENOMINATIONS,
-  chips_count_per_denom: 20,
-  calculator_mode: "SALDO",
-  allow_loans_between_players: true,
-  allow_loans_from_bank: true,
-  max_debt_per_player: null
-};
-
-const sections = [
-  {
-    title: "Setup",
-    description:
-      "Configure table limits, chip counts, and calculator mode before play starts.",
-    items: [
-      "Player selection (2–5 players) and multiplier configuration",
-      "Chip split preview: per-player stacks and bank remainder",
-      "Mode toggle: SALDO vs BUY_IN"
-    ]
-  },
-  {
-    title: "Live Session",
-    description:
-      "Track stacks, rebuys, and loans without needing a backend service.",
-    items: [
-      "Per-player stack value with denomination breakdown",
-      "Rebuy events with funding source: wallet, loan, or new cash",
-      "Loan ledger between players or from the bank"
-    ]
-  },
-  {
-    title: "Settlement",
-    description:
-      "End-of-session calculator to reconcile chip counts and cash transfers.",
-    items: [
-      "Final stack entry by denomination with consistency checks",
-      "Net results summary and Splitwise-style settlement suggestions",
-      "Wallet balance updates (SALDO mode)"
-    ]
-  }
-];
+type Tab = 'session' | 'balances' | 'history' | 'players' | 'settings';
 
 function App() {
+  const {
+    players,
+    sessions,
+    currentSession,
+    settings,
+    loading,
+    addPlayer,
+    removePlayer,
+    startNewSession,
+    updateSessionPlayerChips,
+    updateSessionPlayerChipCounts,
+    completeSession,
+    cancelSession,
+    deleteSession,
+    updateSettings
+  } = useAppState();
+
+  const [activeTab, setActiveTab] = useState<Tab>('session');
+
+  if (loading) {
+    return (
+      <div className="app">
+        <div className="loading-screen">
+          <h1>Loading...</h1>
+          <p>Initializing local database...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
-      <header className="app__header">
-        <div>
-          <p className="eyebrow">Poker Split Wise</p>
-          <h1>Local-first poker bank</h1>
-          <p className="lead">
-            React + TypeScript + Vite scaffold. Everything runs in the browser,
-            no backend required. State can later be persisted to localStorage.
-          </p>
-        </div>
-        <div className="pill">
-          <span className="pill__label">Default config</span>
-          <span className="pill__value">
-            {sampleConfig.players_count} players · {sampleConfig.multiplier}x
-            multiplier · {sampleConfig.chips_count_per_denom} chips/denom
-          </span>
-        </div>
+      <header className="app-header">
+        <h1>Poker Split-Wise</h1>
+        <p className="subtitle">Track poker games and settle balances</p>
       </header>
 
-      <main className="grid">
-        {sections.map((section) => (
-          <SectionCard
-            key={section.title}
-            title={section.title}
-            description={section.description}
-            items={section.items}
+      <nav className="tab-nav">
+        <button
+          className={`tab ${activeTab === 'session' ? 'active' : ''}`}
+          onClick={() => setActiveTab('session')}
+        >
+          {currentSession ? 'Active Session' : 'New Session'}
+        </button>
+        <button
+          className={`tab ${activeTab === 'balances' ? 'active' : ''}`}
+          onClick={() => setActiveTab('balances')}
+        >
+          Balances
+        </button>
+        <button
+          className={`tab ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          History
+        </button>
+        <button
+          className={`tab ${activeTab === 'players' ? 'active' : ''}`}
+          onClick={() => setActiveTab('players')}
+        >
+          Players
+        </button>
+        <button
+          className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          Settings
+        </button>
+      </nav>
+
+      <main className="app-content">
+        {activeTab === 'session' && (
+          <SessionManager
+            players={players}
+            currentSession={currentSession}
+            defaultChips={settings.chips}
+            defaultConversionRate={settings.defaultConversionRate}
+            onStartSession={startNewSession}
+            onUpdateChips={updateSessionPlayerChips}
+            onUpdateChipCounts={updateSessionPlayerChipCounts}
+            onCompleteSession={completeSession}
+            onCancelSession={cancelSession}
           />
-        ))}
+        )}
+
+        {activeTab === 'balances' && (
+          <BalanceView players={players} />
+        )}
+
+        {activeTab === 'history' && (
+          <SessionHistory
+            sessions={sessions}
+            players={players}
+            onDeleteSession={deleteSession}
+          />
+        )}
+
+        {activeTab === 'players' && (
+          <PlayerManagement
+            players={players}
+            onAddPlayer={addPlayer}
+            onRemovePlayer={removePlayer}
+          />
+        )}
+
+        {activeTab === 'settings' && (
+          <Settings
+            settings={settings}
+            onUpdateSettings={updateSettings}
+          />
+        )}
       </main>
 
-      <footer className="footer">
-        <div>
-          <p className="eyebrow">Next up</p>
-          <ul>
-            <li>Define data store for players, sessions, loans.</li>
-            <li>Add forms for session setup and live event capture.</li>
-            <li>Implement settlement calculator and localStorage sync.</li>
-          </ul>
-        </div>
+      <footer className="app-footer">
+        <p>
+          Total players: {players.length} |
+          Completed sessions: {sessions.length}
+        </p>
       </footer>
     </div>
   );
 }
 
 export default App;
-
-
