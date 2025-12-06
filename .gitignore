@@ -20,6 +20,9 @@ data/*.db-*
 .env
 .env.local
 
+# Background process
+.app.pid
+
 # Backend
 server/dist
 server/node_modules
