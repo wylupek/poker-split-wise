@@ -24,18 +24,36 @@ A Splitwise-style settlement system for home poker games. Track poker sessions, 
 ### Installation
 
 ```bash
+# Install frontend dependencies
 npm install
+
+# Install backend dependencies
+cd server
+npm install
+cd ..
 ```
 
 ### Development
 
 ```bash
+# Run both frontend and backend concurrently
 npm run dev
 ```
 
-Open your browser to `http://localhost:5173`
+This starts:
+- **Frontend** at `http://localhost:5173`
+- **Backend API** at `http://localhost:3001/api`
+- **Database** auto-created at `./data/poker-splitwise.db`
 
-No configuration needed - the SQLite database is created automatically in your browser!
+### Running Separately
+
+```bash
+# Terminal 1 - Backend server
+npm run dev:server
+
+# Terminal 2 - Frontend
+npm run dev:client
+```
 
 ### Build for Production
 
@@ -107,42 +125,57 @@ View all past sessions in the **History** tab. You can delete sessions if needed
 
 ## Tech Stack
 
-- **React** - UI framework
+**Frontend:**
+- **React 18** - UI framework
 - **TypeScript** - Type safety
 - **Vite** - Build tool and dev server
-- **CSS** - Styling
-- **sql.js** - SQLite database running in the browser (WebAssembly)
+- **Axios** - HTTP client for API calls
+
+**Backend:**
+- **Node.js** + **Express** - REST API server
+- **better-sqlite3** - SQLite database (local file storage)
+- **TypeScript** - Type safety across the stack
 
 ## Data Storage
 
-All data is stored locally in a **SQLite database** running in your browser:
-- **players** table - Player list and balances
-- **game_sessions** table - Game session history with chip configurations
-- **settings** table - Default chip configurations and conversion rates
+All data is stored locally in a **SQLite database file**:
+- **Location**: `./data/poker-splitwise.db`
+- **Tables**: players, game_sessions, settings
+- **Persists** across server restarts
+- **Independent** from browser - your data is safe!
 
-### Local & Secure
+### Database Schema
 
-- Database file stored in browser localStorage as `poker-splitwise-db`
-- All data stays on your computer
-- No external servers or accounts required
-- Can export/import database for backups
+- **players** - Player list and cumulative balances
+- **game_sessions** - Complete session history with chip configurations
+- **settings** - Default chip values and conversion rates
 
 ### Documentation
 
 - **[Database Schema](./docs/database_schema.md)** - Complete database structure and table definitions
-- **[Database Management](./docs/database_management.md)** - How to query, export, and manage your data
+- **[Database Management](./docs/database_management.md)** - How to query, backup, and manage your data
 - **[General Rules](./docs/general_rules.md)** - Game rules and settlement logic
 
-### Quick Database Management
+### Database Management
 
-To clear all data, open the browser console and run:
-```javascript
-localStorage.removeItem('poker-splitwise-db')
+**View database:**
+```bash
+sqlite3 ./data/poker-splitwise.db
+SELECT * FROM players;
 ```
 
-Then refresh the page to create a fresh database.
+**Backup:**
+```bash
+cp ./data/poker-splitwise.db ./data/backup-$(date +%Y%m%d).db
+```
 
-For advanced operations (export to CSV, query data, backup/restore), see [Database Management Guide](./docs/database_management.md).
+**Reset:**
+```bash
+rm ./data/poker-splitwise.db
+# Database will be recreated on next server start
+```
+
+For more operations, see [Database Management Guide](./docs/database_management.md).
 
 ## Contributing
 

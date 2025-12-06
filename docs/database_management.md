@@ -38,30 +38,54 @@ Delete all players, sessions, and settings:
 
 ```javascript
 // In browser console (F12)
-localStorage.removeItem('poker-splitwise-db');
+async function clearDB() {
+  const request = indexedDB.deleteDatabase('poker-splitwise');
+  request.onsuccess = () => {
+    console.log('Database deleted. Reload page to create fresh database.');
+    location.reload();
+  };
+  request.onerror = () => console.error('Failed to delete database');
+}
+
+clearDB();
 ```
 
-Then reload the page - a fresh database with default settings will be created.
+This will delete the entire IndexedDB database and reload the page with a fresh database.
 
 ### Clear Specific Data
 
 ```javascript
 // Clear only players and sessions (keep settings)
 async function clearData() {
-  const dbData = localStorage.getItem('poker-splitwise-db');
-  const binary = JSON.parse(dbData);
-  const SQL = await initSqlJs({ locateFile: file => `https://sql.js.org/dist/${file}` });
-  const db = new SQL.Database(new Uint8Array(binary));
+  // Open IndexedDB
+  const dbRequest = indexedDB.open('poker-splitwise', 1);
 
-  db.run('DELETE FROM players');
-  db.run('DELETE FROM game_sessions');
+  dbRequest.onsuccess = async () => {
+    const idb = dbRequest.result;
+    const transaction = idb.transaction(['database'], 'readonly');
+    const store = transaction.objectStore('database');
+    const getRequest = store.get('main');
 
-  // Save back
-  const data = db.export();
-  const array = Array.from(data);
-  localStorage.setItem('poker-splitwise-db', JSON.stringify(array));
+    getRequest.onsuccess = async () => {
+      const dbData = new Uint8Array(getRequest.result);
+      const SQL = await initSqlJs({ locateFile: file => `https://sql.js.org/dist/${file}` });
+      const db = new SQL.Database(dbData);
 
-  console.log('Players and sessions cleared. Reload page.');
+      db.run('DELETE FROM players');
+      db.run('DELETE FROM game_sessions');
+
+      // Save back to IndexedDB
+      const exportData = db.export();
+      const writeTransaction = idb.transaction(['database'], 'readwrite');
+      const writeStore = writeTransaction.objectStore('database');
+      writeStore.put(exportData, 'main');
+
+      writeTransaction.oncomplete = () => {
+        console.log('Players and sessions cleared. Reload page.');
+        location.reload();
+      };
+    };
+  };
 }
 
 clearData();
@@ -76,21 +100,33 @@ clearData();
 ```javascript
 // In browser console (F12)
 async function exportDB() {
-  const dbData = localStorage.getItem('poker-splitwise-db');
-  if (!dbData) {
-    console.error('No database found');
-    return;
-  }
+  const dbRequest = indexedDB.open('poker-splitwise', 1);
 
-  const binary = JSON.parse(dbData);
-  const blob = new Blob([new Uint8Array(binary)], { type: 'application/x-sqlite3' });
+  dbRequest.onsuccess = () => {
+    const idb = dbRequest.result;
+    const transaction = idb.transaction(['database'], 'readonly');
+    const store = transaction.objectStore('database');
+    const getRequest = store.get('main');
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'poker-splitwise-' + new Date().toISOString().split('T')[0] + '.db';
-  a.click();
-  URL.revokeObjectURL(url);
+    getRequest.onsuccess = () => {
+      if (!getRequest.result) {
+        console.error('No database found');
+        return;
+      }
+
+      const dbData = new Uint8Array(getRequest.result);
+      const blob = new Blob([dbData], { type: 'application/x-sqlite3' });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'poker-splitwise-' + new Date().toISOString().split('T')[0] + '.db';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      console.log('Database exported!');
+    };
+  };
 }
 
 exportDB();
@@ -104,10 +140,18 @@ exportDB();
 
 ```javascript
 async function exportPlayersCSV() {
-  const dbData = localStorage.getItem('poker-splitwise-db');
-  const binary = JSON.parse(dbData);
-  const SQL = await initSqlJs({ locateFile: file => `https://sql.js.org/dist/${file}` });
-  const db = new SQL.Database(new Uint8Array(binary));
+  const dbRequest = indexedDB.open('poker-splitwise', 1);
+
+  dbRequest.onsuccess = async () => {
+    const idb = dbRequest.result;
+    const transaction = idb.transaction(['database'], 'readonly');
+    const store = transaction.objectStore('database');
+    const getRequest = store.get('main');
+
+    getRequest.onsuccess = async () => {
+      const dbData = new Uint8Array(getRequest.result);
+      const SQL = await initSqlJs({ locateFile: file => `https://sql.js.org/dist/${file}` });
+      const db = new SQL.Database(dbData);
 
   const result = db.exec('SELECT * FROM players ORDER BY name');
   if (result.length === 0) {
@@ -131,6 +175,10 @@ async function exportPlayersCSV() {
   a.download = 'players.csv';
   a.click();
   URL.revokeObjectURL(url);
+
+      console.log('Players exported!');
+    };
+  };
 }
 
 exportPlayersCSV();
@@ -142,10 +190,18 @@ exportPlayersCSV();
 
 ```javascript
 async function exportSessionsCSV() {
-  const dbData = localStorage.getItem('poker-splitwise-db');
-  const binary = JSON.parse(dbData);
-  const SQL = await initSqlJs({ locateFile: file => `https://sql.js.org/dist/${file}` });
-  const db = new SQL.Database(new Uint8Array(binary));
+  const dbRequest = indexedDB.open('poker-splitwise', 1);
+
+  dbRequest.onsuccess = async () => {
+    const idb = dbRequest.result;
+    const transaction = idb.transaction(['database'], 'readonly');
+    const store = transaction.objectStore('database');
+    const getRequest = store.get('main');
+
+    getRequest.onsuccess = async () => {
+      const dbData = new Uint8Array(getRequest.result);
+      const SQL = await initSqlJs({ locateFile: file => `https://sql.js.org/dist/${file}` });
+      const db = new SQL.Database(dbData);
 
   const result = db.exec('SELECT id, date, conversion_rate, starting_chips, completed FROM game_sessions ORDER BY date DESC');
   if (result.length === 0) {
@@ -167,6 +223,10 @@ async function exportSessionsCSV() {
   a.download = 'sessions.csv';
   a.click();
   URL.revokeObjectURL(url);
+
+      console.log('Sessions exported!');
+    };
+  };
 }
 
 exportSessionsCSV();
@@ -187,11 +247,20 @@ async function importDB(file) {
   const SQL = await initSqlJs({ locateFile: file => `https://sql.js.org/dist/${file}` });
   const db = new SQL.Database(uint8Array);
 
-  // Save to localStorage
-  const array = Array.from(uint8Array);
-  localStorage.setItem('poker-splitwise-db', JSON.stringify(array));
+  // Save to IndexedDB
+  const dbRequest = indexedDB.open('poker-splitwise', 1);
 
-  console.log('Database imported! Reload the page.');
+  dbRequest.onsuccess = () => {
+    const idb = dbRequest.result;
+    const transaction = idb.transaction(['database'], 'readwrite');
+    const store = transaction.objectStore('database');
+    store.put(uint8Array, 'main');
+
+    transaction.oncomplete = () => {
+      console.log('Database imported! Reloading...');
+      location.reload();
+    };
+  };
 }
 
 // To use: Create a file input element
@@ -305,10 +374,18 @@ exportDB();
 
 ## Storage Location
 
-- **Browser:** localStorage
-- **Key:** `poker-splitwise-db`
-- **Format:** JSON array of SQLite binary data
-- **Size Limit:** ~5-10MB (browser dependent)
-- **Cleared When:** Browser data is cleared
+- **Browser Database:** IndexedDB
+- **Database Name:** `poker-splitwise`
+- **Object Store:** `database`
+- **Key:** `main`
+- **Format:** SQLite binary data (Uint8Array)
+- **Size Limit:** Several GB (much larger than localStorage)
+- **Cleared When:** Browser data/IndexedDB is cleared
 
-**Warning:** Clearing browser data will delete your database. Always keep backups!
+**Advantages over localStorage:**
+- Much larger storage capacity (GB vs ~5-10MB)
+- Better performance for large datasets
+- Proper database API with transactions
+- Asynchronous operations (non-blocking)
+
+**Warning:** Clearing browser data will delete your IndexedDB. Always keep backups!
