@@ -23,6 +23,20 @@ function shouldShowBorder(hexColor: string): boolean {
   return luminance > 0.85;
 }
 
+// Shared number input handler
+function handleNumberInput(value: string, min: number = 1): number {
+  // Allow empty to be treated as 0 temporarily
+  if (value === '') return 0;
+  const num = parseInt(value, 10);
+  // Only allow valid positive numbers
+  if (isNaN(num) || num < 0) return min;
+  return num;
+}
+
+function enforceMinimum(value: number, min: number = 1): number {
+  return value < min ? min : value;
+}
+
 export function Settings({ settings, onUpdateSettings }: Props) {
   const [chips, setChips] = useState<Chip[]>(settings.chips || []);
   const [hasChanges, setHasChanges] = useState(false);
@@ -39,9 +53,9 @@ export function Settings({ settings, onUpdateSettings }: Props) {
     const newChip: Chip = {
       id: `chip-${Date.now()}`,
       label: `${defaultValue}`,
-      color: '#FF5722',
+      color: '#FFFFFF',
       value: defaultValue,
-      count: 50
+      count: 20
     };
     setChips([...chips, newChip]);
     setHasChanges(true);
@@ -98,96 +112,131 @@ export function Settings({ settings, onUpdateSettings }: Props) {
   };
 
   return (
-    <div className="settings">
-      <h2>Settings</h2>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-poker-400 mb-6 flex items-center gap-2">
+        <span className="text-3xl">⚙️</span>
+        Settings
+      </h2>
 
-      <div className="settings-section">
-        <div className="section-header">
-          <h3>Chip Configuration</h3>
-          <button onClick={handleAddChip} className="btn btn-primary btn-sm">
+      {/* Chip Configuration Section */}
+      <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Chip Configuration</h3>
+            <p className="text-sm text-foreground-muted mt-1">
+              Configure your chip types. These settings will apply to all new sessions.
+            </p>
+          </div>
+          <button
+            onClick={handleAddChip}
+            className="px-4 py-2 rounded-lg font-medium bg-poker-500 hover:bg-poker-600 text-white shadow-glow-sm hover:shadow-glow transition-all"
+          >
             + Add Chip
           </button>
         </div>
-        <p className="settings-description">
-          Configure your chip types. These settings will apply to all new sessions.
-          Existing sessions will keep their original chip configurations.
-        </p>
 
-        <div className="chip-list">
+        {/* Chip List */}
+        <div className="space-y-3 mt-6">
           {chips.map((chip, index) => (
-            <div key={chip.id} className="chip-config-item">
-              <div className="chip-visual">
-                <div
-                  className="chip-circle-large"
-                  style={{
-                    backgroundColor: chip.color,
-                    border: shouldShowBorder(chip.color) ? '3px solid #333' : 'none'
-                  }}
-                >
-                  <div className="chip-value-large" style={{ color: getTextColor(chip.color) }}>
-                    {chip.value}
-                  </div>
-                </div>
+            <div
+              key={chip.id}
+              className="flex items-center gap-4 p-4 bg-background/50 rounded-lg border border-background-lightest hover:border-poker-700/50 transition-all"
+            >
+              {/* Chip Visual */}
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-xl shadow-lg flex-shrink-0"
+                style={{
+                  backgroundColor: chip.color,
+                  border: shouldShowBorder(chip.color) ? '3px solid #333' : 'none',
+                  color: getTextColor(chip.color)
+                }}
+              >
+                {chip.value}
               </div>
 
-              <div className="chip-config-inputs">
-                <div className="input-row">
-                  <div className="form-field">
-                    <label>Value:</label>
-                    <input
-                      type="number"
-                      value={chip.value}
-                      onChange={(e) => handleUpdateChip(chip.id, { value: Math.max(1, Number(e.target.value)) })}
-                      className="input input-sm"
-                      min="1"
-                    />
-                  </div>
+              {/* Inputs */}
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-foreground-muted mb-1 block">Value</label>
+                  <input
+                    type="number"
+                    value={chip.value || ''}
+                    onChange={(e) => {
+                      handleUpdateChip(chip.id, { value: handleNumberInput(e.target.value, 1) });
+                    }}
+                    onBlur={() => {
+                      handleUpdateChip(chip.id, { value: enforceMinimum(chip.value, 1) });
+                    }}
+                    className="w-full bg-background border border-background-lightest rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500 focus:border-poker-500"
+                    min="1"
+                  />
+                </div>
 
-                  <div className="form-field">
-                    <label>Count:</label>
-                    <input
-                      type="number"
-                      value={chip.count}
-                      onChange={(e) => handleUpdateChip(chip.id, { count: Math.max(1, Number(e.target.value)) })}
-                      className="input input-sm"
-                      min="1"
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs text-foreground-muted mb-1 block">Count</label>
+                  <input
+                    type="number"
+                    value={chip.count || ''}
+                    onChange={(e) => {
+                      handleUpdateChip(chip.id, { count: handleNumberInput(e.target.value, 1) });
+                    }}
+                    onBlur={() => {
+                      handleUpdateChip(chip.id, { count: enforceMinimum(chip.count, 1) });
+                    }}
+                    className="w-full bg-background border border-background-lightest rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500 focus:border-poker-500"
+                    min="1"
+                  />
+                </div>
 
-                  <div className="form-field">
-                    <label>Color:</label>
+                <div>
+                  <label className="text-xs text-foreground-muted mb-1 block">Color</label>
+                  <div className="relative w-full h-[42px] rounded-lg overflow-hidden">
                     <input
                       type="color"
                       value={chip.color}
                       onChange={(e) => handleUpdateChip(chip.id, { color: e.target.value })}
-                      className="color-input"
+                      className="absolute inset-0 w-full h-full cursor-pointer"
+                      style={{ padding: 0, border: 'none', outline: 'none' }}
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="chip-config-actions">
+              {/* Actions */}
+              <div className="flex gap-2 flex-shrink-0">
                 <button
                   onClick={() => handleMoveUp(index)}
-                  className="btn btn-secondary btn-icon"
                   disabled={index === 0}
                   title="Move up"
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                    index === 0
+                      ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
+                      : 'bg-background-lightest text-foreground hover:bg-poker-500/20 hover:text-poker-400 border border-poker-700/50'
+                  }`}
                 >
                   ↑
                 </button>
                 <button
                   onClick={() => handleMoveDown(index)}
-                  className="btn btn-secondary btn-icon"
                   disabled={index === chips.length - 1}
                   title="Move down"
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                    index === chips.length - 1
+                      ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
+                      : 'bg-background-lightest text-foreground hover:bg-poker-500/20 hover:text-poker-400 border border-poker-700/50'
+                  }`}
                 >
                   ↓
                 </button>
                 <button
                   onClick={() => handleDeleteChip(chip.id)}
-                  className="btn btn-danger btn-icon"
                   disabled={chips.length <= 1}
                   title="Delete"
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all text-lg ${
+                    chips.length <= 1
+                      ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
+                      : 'bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-700/50'
+                  }`}
                 >
                   ×
                 </button>
@@ -196,32 +245,46 @@ export function Settings({ settings, onUpdateSettings }: Props) {
           ))}
         </div>
 
+        {/* Save/Cancel Buttons */}
         {hasChanges && (
-          <div className="settings-actions">
-            <button onClick={handleSave} className="btn btn-success">
+          <div className="flex gap-3 mt-6 pt-4 border-t border-background-lightest">
+            <button
+              onClick={handleSave}
+              className="flex-1 px-6 py-3 rounded-lg font-semibold bg-poker-500 hover:bg-poker-600 text-white shadow-glow-sm hover:shadow-glow transition-all"
+            >
               Save Chip Configuration
             </button>
-            <button onClick={handleReset} className="btn btn-secondary">
-              Cancel Changes
+            <button
+              onClick={handleReset}
+              className="px-6 py-3 rounded-lg font-medium bg-background-lightest hover:bg-background text-foreground border border-background-lightest transition-all"
+            >
+              Cancel
             </button>
           </div>
         )}
       </div>
 
-      <div className="settings-section">
-        <h3>Default Session Settings</h3>
-        <div className="form-group">
-          <label>
-            Default conversion rate (1 chip = $):
-            <input
-              type="number"
-              value={settings.defaultConversionRate}
-              onChange={(e) => onUpdateSettings({ defaultConversionRate: Number(e.target.value) })}
-              className="input"
-              step="0.01"
-              min="0.01"
-            />
+      {/* Default Session Settings Section */}
+      <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30">
+        <h3 className="text-lg font-semibold text-foreground mb-4">Default Session Settings</h3>
+        <div>
+          <label className="text-sm text-foreground-muted mb-2 block">
+            Default conversion rate (1 chip = $)
           </label>
+          <input
+            type="number"
+            value={settings.defaultConversionRate || ''}
+            onChange={(e) => {
+              const val = handleNumberInput(e.target.value, 0.01);
+              onUpdateSettings({ defaultConversionRate: val });
+            }}
+            onBlur={() => {
+              onUpdateSettings({ defaultConversionRate: enforceMinimum(settings.defaultConversionRate, 0.01) });
+            }}
+            className="w-full sm:w-64 bg-background border border-background-lightest rounded-lg px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500 focus:border-poker-500"
+            step="0.01"
+            min="0.01"
+          />
         </div>
       </div>
     </div>

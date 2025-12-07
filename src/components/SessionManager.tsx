@@ -45,12 +45,10 @@ export function SessionManager({
   const [sessionChips, setSessionChips] = useState<Chip[]>([...defaultChips]);
   const [conversionRate, setConversionRate] = useState(defaultConversionRate);
 
-  // Sync with defaults when they change
   useEffect(() => {
     setSessionChips([...defaultChips]);
   }, [defaultChips]);
 
-  // Auto-adjust chip counts when player selection changes
   useEffect(() => {
     if (selectedPlayerIds.length > 0) {
       setSessionChips(prevChips => prevChips.map(chip => {
@@ -99,32 +97,79 @@ export function SessionManager({
 
   const startingChipsPerPlayer = calculateStartingChipsPerPlayer();
 
+  // ACTIVE SESSION VIEW
   if (currentSession) {
     return (
-      <div className="session-manager active-session">
-        <h2>Active Session</h2>
-        <div className="session-info">
-          <p>Starting chips: {currentSession.startingChips}</p>
-          <p>Conversion rate: 1 chip = ${currentSession.conversionRate.toFixed(2)}</p>
-          <p>Date: {new Date(currentSession.date).toLocaleString()}</p>
+      <div className="space-y-6">
+        {/* Session Info */}
+        <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30">
+          <h2 className="text-2xl font-bold text-poker-400 mb-4 flex items-center gap-2">
+            <span className="text-3xl">🎰</span>
+            Active Session
+          </h2>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="bg-background/50 rounded p-3">
+              <div className="text-foreground-muted text-xs mb-1">Starting Chips</div>
+              <div className="text-2xl font-bold text-foreground">{currentSession.startingChips}</div>
+            </div>
+            <div className="bg-background/50 rounded p-3">
+              <div className="text-foreground-muted text-xs mb-1">Conversion Rate</div>
+              <div className="text-2xl font-bold text-poker-400">
+                ${currentSession.conversionRate.toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-background/50 rounded p-3">
+              <div className="text-foreground-muted text-xs mb-1">Started</div>
+              <div className="text-lg font-medium text-foreground">
+                {new Date(currentSession.date).toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="session-players">
-          <h3>Player Chips</h3>
+        {/* Players */}
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+            <span>👥</span>
+            Player Chips
+          </h3>
+
           {currentSession.players.map(sp => {
             const chipDiff = sp.finalChips - sp.startingChips;
             const moneyDiff = chipDiff * currentSession.conversionRate;
 
             return (
-              <div key={sp.playerId} className="session-player-card">
-                <div className="player-header">
-                  <strong>{getPlayerName(sp.playerId)}</strong>
-                  <div className={`chip-diff ${chipDiff >= 0 ? 'positive' : 'negative'}`}>
-                    {chipDiff >= 0 ? '+' : ''}{chipDiff} chips
-                    ({moneyDiff >= 0 ? '+' : ''}${moneyDiff.toFixed(2)})
+              <div
+                key={sp.playerId}
+                className="bg-background-lightest rounded-lg p-5 border border-background-lightest hover:border-poker-700/50 transition-all"
+              >
+                {/* Player Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-poker-600 to-poker-800 flex items-center justify-center text-white font-bold">
+                      {getPlayerName(sp.playerId).charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="font-bold text-lg text-foreground">
+                        {getPlayerName(sp.playerId)}
+                      </div>
+                      <div className="text-sm text-foreground-muted">
+                        Final: {sp.finalChips} chips
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className={`text-2xl font-bold ${chipDiff >= 0 ? 'text-poker-400' : 'text-red-400'}`}>
+                      {chipDiff >= 0 ? '+' : '−'}{Math.abs(chipDiff)}
+                    </div>
+                    <div className={`text-lg font-medium ${moneyDiff >= 0 ? 'text-poker-400' : 'text-red-400'}`}>
+                      {moneyDiff >= 0 ? '+' : '−'} ${Math.abs(moneyDiff).toFixed(2)}
+                    </div>
                   </div>
                 </div>
 
+                {/* Chip Counter or Manual Input */}
                 {currentSession.chips && sp.chipCounts ? (
                   <ChipCounter
                     chipCounts={sp.chipCounts}
@@ -133,17 +178,17 @@ export function SessionManager({
                     totalValue={sp.finalChips}
                   />
                 ) : (
-                  <div className="manual-chip-input">
-                    <label>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-foreground-muted mb-2">
                       Final chips:
-                      <input
-                        type="number"
-                        value={sp.finalChips}
-                        onChange={(e) => onUpdateChips(sp.playerId, Number(e.target.value))}
-                        className="input input-sm"
-                        min="0"
-                      />
                     </label>
+                    <input
+                      type="number"
+                      value={sp.finalChips}
+                      onChange={(e) => onUpdateChips(sp.playerId, Number(e.target.value))}
+                      className="w-full bg-background border border-background-lightest rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500"
+                      min="0"
+                    />
                   </div>
                 )}
               </div>
@@ -151,11 +196,18 @@ export function SessionManager({
           })}
         </div>
 
-        <div className="session-actions">
-          <button onClick={onCompleteSession} className="btn btn-success">
-            Complete Session
+        {/* Actions */}
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={onCompleteSession}
+            className="flex-1 bg-poker-500 hover:bg-poker-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-glow-sm hover:shadow-glow"
+          >
+            ✓ Complete Session
           </button>
-          <button onClick={onCancelSession} className="btn btn-secondary">
+          <button
+            onClick={onCancelSession}
+            className="bg-background-lightest hover:bg-background-lightest/70 text-foreground-muted hover:text-foreground font-medium py-3 px-6 rounded-lg transition-all"
+          >
             Cancel
           </button>
         </div>
@@ -163,92 +215,167 @@ export function SessionManager({
     );
   }
 
+  // NEW SESSION VIEW
   return (
-    <div className="session-manager">
-      <h2>Start New Session</h2>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-poker-400 mb-6 flex items-center gap-2">
+        <span className="text-3xl">🎲</span>
+        Start New Session
+      </h2>
 
-      <div className="session-setup">
-        <div className="form-group">
-          <label>Select players (at least 2):</label>
-          <div className="player-selection">
+      {/* Player Selection */}
+      <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30">
+        <label className="block text-lg font-semibold text-foreground mb-4">
+          Select Players <span className="text-foreground-muted text-sm font-normal">(minimum 2)</span>
+        </label>
+
+        {players.length === 0 ? (
+          <div className="text-center py-8 text-foreground-muted">
+            <div className="text-4xl mb-2">👥</div>
+            <p>No players yet. Add players in the Players tab first!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {players.map(player => (
-              <label key={player.id} className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={selectedPlayerIds.includes(player.id)}
-                  onChange={() => handlePlayerToggle(player.id)}
-                />
-                {player.name}
-              </label>
+              <button
+                key={player.id}
+                onClick={() => handlePlayerToggle(player.id)}
+                className={`
+                  flex items-center justify-center gap-2 p-4 rounded-lg font-medium transition-all duration-200
+                  ${selectedPlayerIds.includes(player.id)
+                    ? 'bg-poker-500 text-white shadow-glow border-2 border-poker-400'
+                    : 'bg-background text-foreground border-2 border-background-lightest hover:border-poker-600 hover:bg-background/80'
+                  }
+                `}
+              >
+                {selectedPlayerIds.includes(player.id) && <span className="text-lg">✓</span>}
+                <span>{player.name}</span>
+              </button>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Conversion Rate */}
+      <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30">
+        <label className="block text-lg font-semibold text-foreground mb-4">
+          Conversion Rate
+        </label>
+        <div className="flex items-center gap-3">
+          <span className="text-foreground-muted">1 chip =</span>
+          <span className="text-2xl text-poker-400">$</span>
+          <input
+            type="number"
+            value={conversionRate}
+            onChange={(e) => setConversionRate(Number(e.target.value))}
+            className="w-32 bg-background border border-background-lightest rounded-lg px-4 py-2 text-foreground text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-poker-500"
+            step="0.01"
+            min="0.01"
+          />
+        </div>
+      </div>
+
+      {/* Chip Configuration */}
+      <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30">
+        <h3 className="text-lg font-semibold text-foreground mb-2">Chip Configuration</h3>
+
+        {/* Summary */}
+        <div className="bg-background/50 rounded-lg p-4 mb-4 flex items-center justify-between">
+          {selectedPlayerIds.length > 0 ? (
+            <>
+              <div className="text-foreground-muted">
+                Per player: <span className="text-poker-400 font-bold text-xl ml-2">
+                  {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0)}
+                </span>
+              </div>
+              <div className="text-foreground-muted">
+                Total (all players): <span className="text-foreground font-bold text-xl ml-2">
+                  {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0) * selectedPlayerIds.length}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="text-foreground-muted">
+              Total chip value: <span className="text-foreground font-bold text-xl ml-2">
+                {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0)}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="form-group">
-          <label>
-            Conversion rate (1 chip = $ ?):
-            <input
-              type="number"
-              value={conversionRate}
-              onChange={(e) => setConversionRate(Number(e.target.value))}
-              className="input"
-              step="0.01"
-              min="0.01"
-            />
-          </label>
-        </div>
+        {/* Chip List */}
+        <div className="space-y-3">
+          {sessionChips.map((chip) => (
+            <div
+              key={chip.id}
+              className="flex items-center gap-4 bg-background/50 rounded-lg p-4 hover:bg-background/70 transition-all"
+            >
+              {/* Chip Visual */}
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-lg shadow-lg flex-shrink-0"
+                style={{
+                  backgroundColor: chip.color,
+                  color: getTextColor(chip.color),
+                  border: shouldShowBorder(chip.color) ? '3px solid #333' : 'none'
+                }}
+              >
+                {chip.value}
+              </div>
 
-        <div className="chip-setup-section">
-          <h3>Chip Configuration for This Session</h3>
-          <p className="info-text">
-            Total chips: {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0)} value
-            {selectedPlayerIds.length > 0 && (
-              <> | Starting chips per player: <strong>{startingChipsPerPlayer}</strong></>
-            )}
-          </p>
-
-          <div className="chip-setup-list">
-            {sessionChips.map((chip) => (
-              <div key={chip.id} className="chip-setup-item">
-                <div
-                  className="chip-circle-medium"
-                  style={{
-                    backgroundColor: chip.color,
-                    border: shouldShowBorder(chip.color) ? '3px solid #333' : 'none'
-                  }}
-                >
-                  <div className="chip-value-medium" style={{ color: getTextColor(chip.color) }}>
-                    {chip.value}
-                  </div>
+              {/* Chip Info */}
+              <div className="flex-1">
+                <div className="text-foreground font-medium mb-1">
+                  Value: {chip.value}
                 </div>
-
-                <div className="chip-setup-info">
-                  <div className="chip-setup-row">
-                    <div className="chip-count-input">
-                      <label>{selectedPlayerIds.length > 0 ? 'Count per player:' : 'Total count:'}</label>
-                      <input
-                        type="number"
-                        value={chip.count}
-                        onChange={(e) => handleChipCountChange(chip.id, Math.max(0, Number(e.target.value)))}
-                        className="input input-sm"
-                        min="0"
-                      />
-                    </div>
-                  </div>
+                <div className="text-foreground-muted text-sm">
+                  {selectedPlayerIds.length > 0 ? 'Per player' : 'Total'}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        <button
-          onClick={handleStartSession}
-          className="btn btn-primary"
-          disabled={selectedPlayerIds.length < 2}
-        >
-          Start Session
-        </button>
+              {/* Count Input */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleChipCountChange(chip.id, Math.max(0, chip.count - 1))}
+                  className="w-8 h-8 rounded bg-background-lightest hover:bg-poker-900/30 text-foreground font-bold transition-all"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  value={chip.count}
+                  onChange={(e) => handleChipCountChange(chip.id, Math.max(0, Number(e.target.value)))}
+                  className="w-20 bg-background border border-background-lightest rounded px-3 py-2 text-center text-foreground font-semibold focus:outline-none focus:ring-2 focus:ring-poker-500"
+                  min="0"
+                />
+                <button
+                  onClick={() => handleChipCountChange(chip.id, chip.count + 1)}
+                  className="w-8 h-8 rounded bg-background-lightest hover:bg-poker-900/30 text-foreground font-bold transition-all"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Start Button */}
+      <button
+        onClick={handleStartSession}
+        disabled={selectedPlayerIds.length < 2}
+        className={`
+          w-full py-4 px-6 rounded-lg font-bold text-lg transition-all duration-200
+          ${selectedPlayerIds.length < 2
+            ? 'bg-background-lightest text-foreground-muted cursor-not-allowed'
+            : 'bg-poker-500 hover:bg-poker-600 text-white shadow-glow-sm hover:shadow-glow'
+          }
+        `}
+      >
+        {selectedPlayerIds.length < 2
+          ? 'Select at least 2 players to start'
+          : `Start Session with ${selectedPlayerIds.length} players`
+        }
+      </button>
     </div>
   );
 }
