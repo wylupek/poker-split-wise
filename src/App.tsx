@@ -4,9 +4,10 @@ import { PlayerManagement } from './components/PlayerManagement';
 import { SessionManager } from './components/SessionManager';
 import { BalanceView } from './components/BalanceView';
 import { SessionHistory } from './components/SessionHistory';
+import { HandRankings } from './components/HandRankings';
 import { Settings } from './components/Settings';
 
-type Tab = 'session' | 'balances' | 'history' | 'players' | 'settings';
+type Tab = 'session' | 'balances' | 'history' | 'players' | 'rankings' | 'settings';
 
 function App() {
   const {
@@ -63,6 +64,11 @@ function App() {
       id: 'players' as Tab,
       label: 'Players',
       icon: '👥'
+    },
+    {
+      id: 'rankings' as Tab,
+      label: 'Hand Rankings',
+      icon: '🃏'
     },
     {
       id: 'settings' as Tab,
@@ -154,6 +160,10 @@ function App() {
               onAddPlayer={addPlayer}
               onRemovePlayer={removePlayer}
             />
+          )}
+
+          {activeTab === 'rankings' && (
+            <HandRankings />
           )}
 
           {activeTab === 'settings' && (
