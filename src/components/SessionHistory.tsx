@@ -1,9 +1,21 @@
-import { GameSession, Player } from '../types';
+import { GameSession, Player, BorrowTransaction } from '../types';
 
 interface Props {
   sessions: GameSession[];
   players: Player[];
   onDeleteSession: (sessionId: string) => void;
+}
+
+// Calculate correction for a player based on borrow transactions
+function calculatePlayerCorrection(playerId: string, transactions: BorrowTransaction[]): number {
+  return transactions.reduce((correction, tx) => {
+    if (tx.borrower === playerId) {
+      return correction + tx.amount; // Borrowed chips (debt)
+    } else if (tx.lender === playerId) {
+      return correction - tx.amount; // Lent chips (credit)
+    }
+    return correction;
+  }, 0);
 }
 
 export function SessionHistory({ sessions, players, onDeleteSession }: Props) {
@@ -131,7 +143,8 @@ export function SessionHistory({ sessions, players, onDeleteSession }: Props) {
                   <div className="space-y-2">
                     {session.players
                       .map(sp => {
-                        const chipDiff = sp.finalChips - sp.startingChips;
+                        const correction = calculatePlayerCorrection(sp.playerId, session.borrowTransactions || []);
+                        const chipDiff = (sp.finalChips - sp.startingChips) - correction;
                         const moneyDiff = chipDiff * session.conversionRate;
                         return { ...sp, chipDiff, moneyDiff };
                       })

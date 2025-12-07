@@ -20,6 +20,7 @@ function App() {
     startNewSession,
     updateSessionPlayerChips,
     updateSessionPlayerChipCounts,
+    updateSessionTransactions,
     completeSession,
     cancelSession,
     deleteSession,
@@ -129,6 +130,7 @@ function App() {
               onStartSession={startNewSession}
               onUpdateChips={updateSessionPlayerChips}
               onUpdateChipCounts={updateSessionPlayerChipCounts}
+              onUpdateTransactions={updateSessionTransactions}
               onCompleteSession={completeSession}
               onCancelSession={cancelSession}
             />

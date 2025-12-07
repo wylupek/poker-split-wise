@@ -16,6 +16,7 @@ export function getAllSessions(req: Request, res: Response): void {
       startingChips: row.starting_chips,
       chips: JSON.parse(row.chips),
       players: JSON.parse(row.players),
+      borrowTransactions: row.borrow_transactions ? JSON.parse(row.borrow_transactions) : undefined,
       completed: row.completed === 1
     }));
 
@@ -47,7 +48,7 @@ export function createSession(req: Request, res: Response): void {
       // Update existing session
       db.prepare(
         `UPDATE game_sessions
-         SET date = ?, end_time = ?, conversion_rate = ?, starting_chips = ?, chips = ?, players = ?, completed = ?, updated_at = CURRENT_TIMESTAMP
+         SET date = ?, end_time = ?, conversion_rate = ?, starting_chips = ?, chips = ?, players = ?, borrow_transactions = ?, completed = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`
       ).run(
         session.date,
@@ -56,14 +57,15 @@ export function createSession(req: Request, res: Response): void {
         session.startingChips,
         JSON.stringify(session.chips || []),
         JSON.stringify(session.players),
+        session.borrowTransactions ? JSON.stringify(session.borrowTransactions) : null,
         session.completed ? 1 : 0,
         session.id
       );
     } else {
       // Insert new session
       db.prepare(
-        `INSERT INTO game_sessions (id, date, end_time, conversion_rate, starting_chips, chips, players, completed)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO game_sessions (id, date, end_time, conversion_rate, starting_chips, chips, players, borrow_transactions, completed)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         session.id,
         session.date,
@@ -72,6 +74,7 @@ export function createSession(req: Request, res: Response): void {
         session.startingChips,
         JSON.stringify(session.chips || []),
         JSON.stringify(session.players),
+        session.borrowTransactions ? JSON.stringify(session.borrowTransactions) : null,
         session.completed ? 1 : 0
       );
     }

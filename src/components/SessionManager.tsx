@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Player, GameSession, Chip } from '../types';
+import { Player, GameSession, Chip, BorrowTransaction } from '../types';
 import { ChipCounter } from './ChipCounter';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   onStartSession: (playerIds: string[], chips: Chip[], conversionRate: number) => void;
   onUpdateChips: (playerId: string, finalChips: number) => void;
   onUpdateChipCounts: (playerId: string, chipId: string, count: number) => void;
+  onUpdateTransactions: (transactions: BorrowTransaction[]) => void;
   onCompleteSession: (finalChipsOverride?: Record<string, number>) => void;
   onCancelSession: () => void;
 }
@@ -44,6 +45,20 @@ function enforceMinimum(value: number, min: number = 0): number {
   return value < min ? min : value;
 }
 
+// Calculate correction for a player based on borrow transactions
+// If player borrows chips: positive correction (needs more chips to break even)
+// If player lends chips: negative correction (needs fewer chips to break even)
+function calculatePlayerCorrection(playerId: string, transactions: BorrowTransaction[]): number {
+  return transactions.reduce((correction, tx) => {
+    if (tx.borrower === playerId) {
+      return correction + tx.amount; // Borrowed chips (debt)
+    } else if (tx.lender === playerId) {
+      return correction - tx.amount; // Lent chips (credit)
+    }
+    return correction;
+  }, 0);
+}
+
 export function SessionManager({
   players,
   currentSession,
@@ -52,6 +67,7 @@ export function SessionManager({
   onStartSession,
   onUpdateChips,
   onUpdateChipCounts,
+  onUpdateTransactions,
   onCompleteSession,
   onCancelSession
 }: Props) {
@@ -193,7 +209,9 @@ export function SessionManager({
               currentTotal = quickTotalValues[sp.playerId] ?? sp.startingChips;
             }
 
-            const chipDiff = currentTotal - sp.startingChips;
+            // Calculate correction from borrow transactions
+            const correction = calculatePlayerCorrection(sp.playerId, currentSession.borrowTransactions || []);
+            const chipDiff = (currentTotal - sp.startingChips) - correction;
             const moneyDiff = chipDiff * currentSession.conversionRate;
 
             return (
@@ -265,17 +283,15 @@ export function SessionManager({
                       </label>
                       <input
                         type="number"
-                        value={(quickTotalValues[sp.playerId] ?? sp.startingChips) || ''}
+                        value={quickTotalValues[sp.playerId] ?? sp.startingChips}
                         onChange={(e) => {
                           const total = handleNumberInput(e.target.value, 0);
                           setQuickTotalValues(prev => ({ ...prev, [sp.playerId]: total }));
                         }}
                         onBlur={() => {
                           const currentValue = quickTotalValues[sp.playerId];
-                          if (currentValue === undefined || currentValue === 0) {
+                          if (currentValue === undefined) {
                             setQuickTotalValues(prev => ({ ...prev, [sp.playerId]: sp.startingChips }));
-                          } else {
-                            setQuickTotalValues(prev => ({ ...prev, [sp.playerId]: enforceMinimum(currentValue, 0) }));
                           }
                         }}
                         className="w-full bg-background border border-background-lightest rounded-lg px-4 py-3 text-foreground text-lg font-medium focus:outline-none focus:ring-2 focus:ring-poker-500 focus:border-poker-500"
@@ -301,6 +317,121 @@ export function SessionManager({
               </div>
             );
           })}
+        </div>
+
+        {/* Transactions Section */}
+        <div className="space-y-4 mt-6">
+          <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
+            <span>💸</span>
+            Borrow/Lend Transactions
+          </h3>
+
+          <div className="bg-background-lightest rounded-lg p-5 border border-background-lightest">
+            {/* Transaction List */}
+            {currentSession.borrowTransactions && currentSession.borrowTransactions.length > 0 ? (
+              <div className="space-y-3 mb-4">
+                {currentSession.borrowTransactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="flex items-center gap-3 bg-background/50 rounded-lg p-3 border border-background-lightest"
+                  >
+                    {/* Lender (FROM) - chips flow FROM here */}
+                    <select
+                      value={tx.lender}
+                      onChange={(e) => {
+                        const updated = currentSession.borrowTransactions!.map(t =>
+                          t.id === tx.id ? { ...t, lender: e.target.value } : t
+                        );
+                        onUpdateTransactions(updated);
+                      }}
+                      className="flex-1 bg-background border border-background-lightest rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500"
+                    >
+                      <option value="bank">Bank</option>
+                      {currentSession.players.map(sp => (
+                        <option key={sp.playerId} value={sp.playerId}>
+                          {getPlayerName(sp.playerId)}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Arrow (direction of chip flow) */}
+                    <span className="text-poker-400 font-bold text-lg">→</span>
+
+                    {/* Borrower (TO) - chips flow TO here */}
+                    <select
+                      value={tx.borrower}
+                      onChange={(e) => {
+                        const updated = currentSession.borrowTransactions!.map(t =>
+                          t.id === tx.id ? { ...t, borrower: e.target.value } : t
+                        );
+                        onUpdateTransactions(updated);
+                      }}
+                      className="flex-1 bg-background border border-background-lightest rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500"
+                    >
+                      <option value="bank">Bank</option>
+                      {currentSession.players.map(sp => (
+                        <option key={sp.playerId} value={sp.playerId}>
+                          {getPlayerName(sp.playerId)}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Amount */}
+                    <input
+                      type="number"
+                      value={tx.amount}
+                      onChange={(e) => {
+                        const amount = handleNumberInput(e.target.value, 0);
+                        const updated = currentSession.borrowTransactions!.map(t =>
+                          t.id === tx.id ? { ...t, amount } : t
+                        );
+                        onUpdateTransactions(updated);
+                      }}
+                      className="w-32 bg-background border border-background-lightest rounded-lg px-3 py-2 text-foreground text-center font-medium focus:outline-none focus:ring-2 focus:ring-poker-500"
+                      min="0"
+                      placeholder="Amount"
+                    />
+                    <span className="text-foreground-muted text-sm">chips</span>
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => {
+                        const updated = currentSession.borrowTransactions!.filter(t => t.id !== tx.id);
+                        onUpdateTransactions(updated);
+                      }}
+                      className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg border border-red-700/50 transition-all"
+                      title="Delete transaction"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-foreground-muted text-sm mb-4">
+                No transactions yet. Add one below if someone borrowed chips.
+              </div>
+            )}
+
+            {/* Add Transaction Button */}
+            <button
+              onClick={() => {
+                const newTransaction: BorrowTransaction = {
+                  id: crypto.randomUUID(),
+                  lender: 'bank', // Default: Bank lends
+                  borrower: currentSession.players[0]?.playerId || 'bank', // to first player
+                  amount: 0,
+                  timestamp: new Date().toISOString()
+                };
+                const updated = [...(currentSession.borrowTransactions || []), newTransaction];
+                onUpdateTransactions(updated);
+              }}
+              className="w-full bg-background hover:bg-background-lightest text-poker-400 font-medium py-2 px-4 rounded-lg border border-poker-700/50 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="text-xl">+</span>
+              Add Transaction
+            </button>
+          </div>
         </div>
 
         {/* Actions */}
@@ -355,7 +486,8 @@ export function SessionManager({
                     currentTotal = quickTotalValues[sp.playerId] ?? sp.startingChips;
                   }
 
-                  const chipDiff = currentTotal - sp.startingChips;
+                  const correction = calculatePlayerCorrection(sp.playerId, currentSession.borrowTransactions || []);
+                  const chipDiff = (currentTotal - sp.startingChips) - correction;
                   const moneyDiff = chipDiff * currentSession.conversionRate;
                   return sum + moneyDiff;
                 }, 0);

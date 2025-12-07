@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Player, GameSession, ChipCounts, Chip } from '../types';
+import { Player, GameSession, ChipCounts, Chip, BorrowTransaction } from '../types';
 import {
   loadPlayers,
   savePlayer,
@@ -147,6 +147,19 @@ export function useAppState() {
     });
   };
 
+  const updateSessionTransactions = (transactions: BorrowTransaction[]) => {
+    if (!currentSession) return;
+
+    setCurrentSession(prev => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        borrowTransactions: transactions
+      };
+    });
+  };
+
   const updateSettingsState = async (newSettings: Partial<Settings>) => {
     const updated = { ...settings, ...newSettings };
     setSettings(updated);
@@ -168,11 +181,12 @@ export function useAppState() {
       };
     }
 
-    // Calculate session results
+    // Calculate session results (including borrow transaction corrections)
     const results = calculateSessionResults(
       sessionToComplete.startingChips,
       sessionToComplete.conversionRate,
-      sessionToComplete.players
+      sessionToComplete.players,
+      sessionToComplete.borrowTransactions || []
     );
 
     // Update player balances
@@ -213,11 +227,12 @@ export function useAppState() {
     const sessionToDelete = sessions.find(s => s.id === sessionId);
     if (!sessionToDelete) return;
 
-    // Reverse the balance changes
+    // Reverse the balance changes (including borrow transaction corrections)
     const results = calculateSessionResults(
       sessionToDelete.startingChips,
       sessionToDelete.conversionRate,
-      sessionToDelete.players
+      sessionToDelete.players,
+      sessionToDelete.borrowTransactions || []
     );
 
     const updatedPlayers = await Promise.all(
@@ -253,6 +268,7 @@ export function useAppState() {
     startNewSession,
     updateSessionPlayerChips,
     updateSessionPlayerChipCounts,
+    updateSessionTransactions,
     completeSession,
     cancelSession,
     deleteSession: deleteSessionById,

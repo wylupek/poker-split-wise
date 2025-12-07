@@ -83,6 +83,14 @@ function initializeSchema(db: Database.Database): void {
     console.log('✓ Added end_time column to game_sessions table');
   }
 
+  // Migration: Add borrow_transactions column to existing game_sessions table if it doesn't exist
+  const hasBorrowTransactions = tableInfo.some(col => col.name === 'borrow_transactions');
+
+  if (!hasBorrowTransactions) {
+    db.exec('ALTER TABLE game_sessions ADD COLUMN borrow_transactions TEXT');
+    console.log('✓ Added borrow_transactions column to game_sessions table');
+  }
+
   // Create indexes
   db.exec('CREATE INDEX IF NOT EXISTS idx_players_name ON players(name)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_game_sessions_date ON game_sessions(date DESC)');

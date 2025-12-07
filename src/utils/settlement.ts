@@ -1,4 +1,4 @@
-import { Player, Transaction } from '../types';
+import { Player, Transaction, BorrowTransaction } from '../types';
 
 /**
  * Computes the minimal set of transactions needed to settle all balances.
@@ -55,17 +55,36 @@ export function calculateMinimalSettlement(players: Player[]): Transaction[] {
 }
 
 /**
+ * Calculate correction for a player based on borrow transactions
+ * If player borrows chips: positive correction (they owe, so subtract from P&L)
+ * If player lends chips: negative correction (they're owed, so add to P&L)
+ */
+function calculatePlayerCorrection(playerId: string, transactions: BorrowTransaction[]): number {
+  return transactions.reduce((correction, tx) => {
+    if (tx.borrower === playerId) {
+      return correction + tx.amount; // Borrowed chips (debt)
+    } else if (tx.lender === playerId) {
+      return correction - tx.amount; // Lent chips (credit)
+    }
+    return correction;
+  }, 0);
+}
+
+/**
  * Calculates session results and updates player balances
+ * Includes corrections from borrow/lend transactions
  */
 export function calculateSessionResults(
   startingChips: number,
   conversionRate: number,
-  sessionPlayers: Array<{ playerId: string; finalChips: number }>
+  sessionPlayers: Array<{ playerId: string; finalChips: number }>,
+  borrowTransactions: BorrowTransaction[] = []
 ): Map<string, number> {
   const results = new Map<string, number>();
 
   sessionPlayers.forEach(({ playerId, finalChips }) => {
-    const chipDifference = finalChips - startingChips;
+    const correction = calculatePlayerCorrection(playerId, borrowTransactions);
+    const chipDifference = (finalChips - startingChips) - correction;
     const sessionValue = chipDifference * conversionRate;
     results.set(playerId, sessionValue);
   });

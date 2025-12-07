@@ -23,6 +23,14 @@ export interface SessionPlayer {
   chipCounts?: ChipCounts; // Optional: for visual chip counting
 }
 
+export interface BorrowTransaction {
+  id: string;
+  borrower: string; // Player ID or "bank"
+  lender: string; // Player ID or "bank"
+  amount: number; // Chip amount
+  timestamp: string;
+}
+
 export interface GameSession {
   id: string;
   date: string; // ISO date string (start time)
@@ -32,6 +40,7 @@ export interface GameSession {
   players: SessionPlayer[];
   completed: boolean;
   chips?: Chip[]; // Store chip definitions used in this session
+  borrowTransactions?: BorrowTransaction[]; // Track chip loans during session
 }
 
 export interface Transaction {
@@ -82,6 +91,7 @@ export interface DbGameSession {
   starting_chips: number;
   chips: string; // JSON string
   players: string; // JSON string
+  borrow_transactions: string | null; // JSON string
   completed: number; // SQLite boolean (0 or 1)
   created_at: string;
   updated_at: string;
