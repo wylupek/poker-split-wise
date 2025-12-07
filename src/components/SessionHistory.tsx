@@ -39,6 +39,42 @@ export function SessionHistory({ sessions, players, onDeleteSession }: Props) {
     return `${minutes}m`;
   };
 
+  const exportToJSON = () => {
+    // Create enhanced session data with player names
+    const exportData = sessions.map(session => ({
+      ...session,
+      players: session.players.map(sp => {
+        const correction = calculatePlayerCorrection(sp.playerId, session.borrowTransactions || []);
+        const chipDiff = (sp.finalChips - sp.startingChips) - correction;
+        const moneyDiff = chipDiff * session.conversionRate;
+
+        return {
+          ...sp,
+          playerName: getPlayerName(sp.playerId),
+          chipDiff,
+          moneyDiff
+        };
+      }),
+      borrowTransactions: session.borrowTransactions?.map(tx => ({
+        ...tx,
+        borrowerName: tx.borrower === 'bank' ? 'Bank' : getPlayerName(tx.borrower),
+        lenderName: tx.lender === 'bank' ? 'Bank' : getPlayerName(tx.lender)
+      }))
+    }));
+
+    // Create downloadable JSON file
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `poker-session-history-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (sessions.length === 0) {
     return (
       <div className="space-y-6">
@@ -62,10 +98,20 @@ export function SessionHistory({ sessions, players, onDeleteSession }: Props) {
           <span className="text-3xl">📊</span>
           Session History
         </h2>
-        <div className="px-4 py-2 bg-poker-900/20 rounded-full border border-poker-700/50">
-          <span className="text-foreground-muted text-sm">
-            Total: <span className="text-poker-400 font-bold">{sessions.length}</span> session{sessions.length !== 1 ? 's' : ''}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="px-4 py-2 bg-poker-900/20 rounded-full border border-poker-700/50">
+            <span className="text-foreground-muted text-sm">
+              Total: <span className="text-poker-400 font-bold">{sessions.length}</span> session{sessions.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <button
+            onClick={exportToJSON}
+            className="px-4 py-2 bg-poker-600/20 hover:bg-poker-600/30 rounded-lg border border-poker-700/50 transition-all flex items-center gap-2 text-poker-400 font-medium"
+            title="Export session history to JSON"
+          >
+            <span className="text-lg">📥</span>
+            Export JSON
+          </button>
         </div>
       </div>
 
