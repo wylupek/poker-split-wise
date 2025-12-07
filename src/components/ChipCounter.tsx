@@ -5,6 +5,7 @@ interface Props {
   chips: Chip[];
   onChipCountChange: (chipId: string, count: number) => void;
   totalValue: number;
+  startingChips?: number;
 }
 
 function getTextColor(hexColor: string): string {
@@ -23,7 +24,7 @@ function shouldShowBorder(hexColor: string): boolean {
   return luminance > 0.85;
 }
 
-export function ChipCounter({ chipCounts, chips, onChipCountChange, totalValue }: Props) {
+export function ChipCounter({ chipCounts, chips, onChipCountChange, totalValue, startingChips = 0 }: Props) {
   // Smart grid: adapt columns based on number of chips
   const getGridCols = () => {
     const chipCount = chips.length;
@@ -32,6 +33,13 @@ export function ChipCounter({ chipCounts, chips, onChipCountChange, totalValue }
     if (chipCount === 5) return 'grid-cols-2 sm:grid-cols-5'; // 2 mobile, 5 desktop
     if (chipCount === 6) return 'grid-cols-2 sm:grid-cols-3'; // 2 mobile, 3 desktop (2 rows)
     return 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'; // default
+  };
+
+  // Determine color based on profit/loss
+  const getTotalColor = () => {
+    if (totalValue > startingChips) return 'text-poker-400'; // green for profit
+    if (totalValue < startingChips) return 'text-red-400'; // red for loss
+    return 'text-foreground'; // neutral for break even
   };
 
   return (
@@ -96,7 +104,7 @@ export function ChipCounter({ chipCounts, chips, onChipCountChange, totalValue }
       <div className="bg-poker-900/20 rounded-lg p-4 border border-poker-700/50">
         <div className="flex items-center justify-between">
           <span className="text-foreground-muted font-medium">Total Chips:</span>
-          <span className="text-2xl font-bold text-poker-400">{totalValue}</span>
+          <span className="text-2xl font-bold text-foreground">{totalValue}</span>
         </div>
       </div>
     </div>

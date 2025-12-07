@@ -63,6 +63,7 @@ function initializeSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS game_sessions (
       id TEXT PRIMARY KEY,
       date TEXT DEFAULT CURRENT_TIMESTAMP,
+      end_time TEXT,
       conversion_rate REAL NOT NULL,
       starting_chips INTEGER NOT NULL,
       chips TEXT NOT NULL,
@@ -72,6 +73,15 @@ function initializeSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Migration: Add end_time column to existing game_sessions table if it doesn't exist
+  const tableInfo = db.prepare("PRAGMA table_info(game_sessions)").all() as { name: string }[];
+  const hasEndTime = tableInfo.some(col => col.name === 'end_time');
+
+  if (!hasEndTime) {
+    db.exec('ALTER TABLE game_sessions ADD COLUMN end_time TEXT');
+    console.log('✓ Added end_time column to game_sessions table');
+  }
 
   // Create indexes
   db.exec('CREATE INDEX IF NOT EXISTS idx_players_name ON players(name)');

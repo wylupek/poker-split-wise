@@ -10,7 +10,7 @@ interface Props {
   onStartSession: (playerIds: string[], chips: Chip[], conversionRate: number) => void;
   onUpdateChips: (playerId: string, finalChips: number) => void;
   onUpdateChipCounts: (playerId: string, chipId: string, count: number) => void;
-  onCompleteSession: () => void;
+  onCompleteSession: (finalChipsOverride?: Record<string, number>) => void;
   onCancelSession: () => void;
 }
 
@@ -30,6 +30,20 @@ function shouldShowBorder(hexColor: string): boolean {
   return luminance > 0.85;
 }
 
+// Shared number input handler
+function handleNumberInput(value: string, min: number = 0): number {
+  // Allow empty to be treated as 0 temporarily
+  if (value === '') return 0;
+  const num = parseFloat(value);
+  // Only allow valid positive numbers
+  if (isNaN(num) || num < 0) return min;
+  return num;
+}
+
+function enforceMinimum(value: number, min: number = 0): number {
+  return value < min ? min : value;
+}
+
 export function SessionManager({
   players,
   currentSession,
@@ -44,6 +58,8 @@ export function SessionManager({
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [sessionChips, setSessionChips] = useState<Chip[]>([...defaultChips]);
   const [conversionRate, setConversionRate] = useState(defaultConversionRate);
+  const [inputMode, setInputMode] = useState<Record<string, 'counter' | 'total'>>({});
+  const [quickTotalValues, setQuickTotalValues] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setSessionChips([...defaultChips]);
@@ -62,6 +78,21 @@ export function SessionManager({
       setSessionChips([...defaultChips]);
     }
   }, [selectedPlayerIds.length, defaultChips]);
+
+  // Initialize quickTotalValues for all players in the current session
+  useEffect(() => {
+    if (currentSession) {
+      setQuickTotalValues(prev => {
+        const updated = { ...prev };
+        currentSession.players.forEach(sp => {
+          if (updated[sp.playerId] === undefined) {
+            updated[sp.playerId] = sp.startingChips;
+          }
+        });
+        return updated;
+      });
+    }
+  }, [currentSession?.id]); // Only run when session changes
 
   const handlePlayerToggle = (playerId: string) => {
     setSelectedPlayerIds(prev =>
@@ -107,15 +138,27 @@ export function SessionManager({
             <span className="text-3xl">🎰</span>
             Active Session
           </h2>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-sm">
             <div className="bg-background/50 rounded p-3">
-              <div className="text-foreground-muted text-xs mb-1">Starting Chips</div>
+              <div className="text-foreground-muted text-xs mb-1">Starting Chips (per player)</div>
               <div className="text-2xl font-bold text-foreground">{currentSession.startingChips}</div>
+            </div>
+            <div className="bg-background/50 rounded p-3">
+              <div className="text-foreground-muted text-xs mb-1">Total Chips</div>
+              <div className="text-2xl font-bold text-foreground">
+                {currentSession.startingChips * currentSession.players.length}
+              </div>
             </div>
             <div className="bg-background/50 rounded p-3">
               <div className="text-foreground-muted text-xs mb-1">Conversion Rate</div>
               <div className="text-2xl font-bold text-poker-400">
                 ${currentSession.conversionRate.toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-background/50 rounded p-3">
+              <div className="text-foreground-muted text-xs mb-1">Total Value</div>
+              <div className="text-2xl font-bold text-poker-400">
+                ${(currentSession.startingChips * currentSession.players.length * currentSession.conversionRate).toFixed(2)}
               </div>
             </div>
             <div className="bg-background/50 rounded p-3">
@@ -135,7 +178,22 @@ export function SessionManager({
           </h3>
 
           {currentSession.players.map(sp => {
-            const chipDiff = sp.finalChips - sp.startingChips;
+            const currentMode = inputMode[sp.playerId] || 'counter';
+
+            // Calculate current total based on active tab ONLY
+            let currentTotal = sp.startingChips;
+            if (currentMode === 'counter' && sp.chipCounts && currentSession.chips) {
+              // Chip Counter mode: calculate from chip counts
+              currentTotal = Object.entries(sp.chipCounts).reduce((sum, [chipId, count]) => {
+                const chip = currentSession.chips!.find(c => c.id === chipId);
+                return sum + (chip ? count * chip.value : 0);
+              }, 0);
+            } else {
+              // Quick Total mode: use local quickTotalValues
+              currentTotal = quickTotalValues[sp.playerId] ?? sp.startingChips;
+            }
+
+            const chipDiff = currentTotal - sp.startingChips;
             const moneyDiff = chipDiff * currentSession.conversionRate;
 
             return (
@@ -149,13 +207,8 @@ export function SessionManager({
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-poker-600 to-poker-800 flex items-center justify-center text-white font-bold">
                       {getPlayerName(sp.playerId).charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <div className="font-bold text-lg text-foreground">
-                        {getPlayerName(sp.playerId)}
-                      </div>
-                      <div className="text-sm text-foreground-muted">
-                        Final: {sp.finalChips} chips
-                      </div>
+                    <div className="font-bold text-lg text-foreground">
+                      {getPlayerName(sp.playerId)}
                     </div>
                   </div>
 
@@ -169,14 +222,68 @@ export function SessionManager({
                   </div>
                 </div>
 
+                {/* Input Mode Toggle */}
+                {currentSession.chips && sp.chipCounts && (
+                  <div className="mb-3 flex gap-2">
+                    <button
+                      onClick={() => setInputMode(prev => ({ ...prev, [sp.playerId]: 'counter' }))}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        (inputMode[sp.playerId] || 'counter') === 'counter'
+                          ? 'bg-poker-500 text-white shadow-glow-sm'
+                          : 'bg-background text-foreground-muted hover:bg-background-lightest border border-background-lightest'
+                      }`}
+                    >
+                      Chip Counter
+                    </button>
+                    <button
+                      onClick={() => setInputMode(prev => ({ ...prev, [sp.playerId]: 'total' }))}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        inputMode[sp.playerId] === 'total'
+                          ? 'bg-poker-500 text-white shadow-glow-sm'
+                          : 'bg-background text-foreground-muted hover:bg-background-lightest border border-background-lightest'
+                      }`}
+                    >
+                      Quick Total
+                    </button>
+                  </div>
+                )}
+
                 {/* Chip Counter or Manual Input */}
                 {currentSession.chips && sp.chipCounts ? (
-                  <ChipCounter
-                    chipCounts={sp.chipCounts}
-                    chips={currentSession.chips}
-                    onChipCountChange={(chipId, count) => onUpdateChipCounts(sp.playerId, chipId, count)}
-                    totalValue={sp.finalChips}
-                  />
+                  (inputMode[sp.playerId] || 'counter') === 'counter' ? (
+                    <ChipCounter
+                      chipCounts={sp.chipCounts}
+                      chips={currentSession.chips}
+                      onChipCountChange={(chipId, count) => onUpdateChipCounts(sp.playerId, chipId, count)}
+                      totalValue={currentTotal}
+                      startingChips={sp.startingChips}
+                    />
+                  ) : (
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium text-foreground-muted mb-2">
+                        Total chips:
+                      </label>
+                      <input
+                        type="number"
+                        value={(quickTotalValues[sp.playerId] ?? sp.startingChips) || ''}
+                        onChange={(e) => {
+                          const total = handleNumberInput(e.target.value, 0);
+                          setQuickTotalValues(prev => ({ ...prev, [sp.playerId]: total }));
+                        }}
+                        onBlur={() => {
+                          const currentValue = quickTotalValues[sp.playerId];
+                          if (currentValue === undefined || currentValue === 0) {
+                            setQuickTotalValues(prev => ({ ...prev, [sp.playerId]: sp.startingChips }));
+                          } else {
+                            setQuickTotalValues(prev => ({ ...prev, [sp.playerId]: enforceMinimum(currentValue, 0) }));
+                          }
+                        }}
+                        className="w-full bg-background border border-background-lightest rounded-lg px-4 py-3 text-foreground text-lg font-medium focus:outline-none focus:ring-2 focus:ring-poker-500 focus:border-poker-500"
+                        min="0"
+                        placeholder={`Default: ${sp.startingChips} chips`}
+                      />
+                    </div>
+                  )
                 ) : (
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-foreground-muted mb-2">
@@ -197,16 +304,70 @@ export function SessionManager({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4">
+        <div className="flex items-center gap-3 pt-4">
           <button
-            onClick={onCompleteSession}
+            onClick={() => {
+              // Build finalChips map based on active tab for each player
+              const finalChipsMap: Record<string, number> = {};
+
+              currentSession.players.forEach(sp => {
+                const mode = inputMode[sp.playerId] || 'counter';
+
+                if (mode === 'total') {
+                  // Use Quick Total value
+                  const quickTotal = quickTotalValues[sp.playerId] ?? sp.startingChips;
+                  finalChipsMap[sp.playerId] = quickTotal;
+                } else {
+                  // Calculate total from chip counts
+                  if (sp.chipCounts && currentSession.chips) {
+                    const total = Object.entries(sp.chipCounts).reduce((sum, [chipId, count]) => {
+                      const chip = currentSession.chips!.find(c => c.id === chipId);
+                      return sum + (chip ? count * chip.value : 0);
+                    }, 0);
+                    finalChipsMap[sp.playerId] = total;
+                  }
+                }
+              });
+
+              // Pass finalChips directly to avoid state closure issues
+              onCompleteSession(finalChipsMap);
+            }}
             className="flex-1 bg-poker-500 hover:bg-poker-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-glow-sm hover:shadow-glow"
           >
             ✓ Complete Session
           </button>
+
+          {/* Game Saldo */}
+          <div className="px-4 py-3 bg-background-lightest rounded-lg border border-background-lightest flex items-center gap-3">
+            <span className="text-sm text-foreground-muted">Game Saldo:</span>
+            <span className="text-lg font-bold text-foreground">
+              ${(() => {
+                const totalSaldo = currentSession.players.reduce((sum, sp) => {
+                  const currentMode = inputMode[sp.playerId] || 'counter';
+                  let currentTotal = sp.startingChips;
+
+                  if (currentMode === 'counter' && sp.chipCounts && currentSession.chips) {
+                    currentTotal = Object.entries(sp.chipCounts).reduce((chipSum, [chipId, count]) => {
+                      const chip = currentSession.chips!.find(c => c.id === chipId);
+                      return chipSum + (chip ? count * chip.value : 0);
+                    }, 0);
+                  } else {
+                    currentTotal = quickTotalValues[sp.playerId] ?? sp.startingChips;
+                  }
+
+                  const chipDiff = currentTotal - sp.startingChips;
+                  const moneyDiff = chipDiff * currentSession.conversionRate;
+                  return sum + moneyDiff;
+                }, 0);
+                // Handle negative zero
+                return Math.abs(totalSaldo) < 0.001 ? '0.00' : totalSaldo.toFixed(2);
+              })()}
+            </span>
+          </div>
+
           <button
             onClick={onCancelSession}
-            className="bg-background-lightest hover:bg-background-lightest/70 text-foreground-muted hover:text-foreground font-medium py-3 px-6 rounded-lg transition-all"
+            className="bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium py-3 px-6 rounded-lg border border-red-700/50 transition-all"
           >
             Cancel
           </button>

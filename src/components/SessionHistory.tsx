@@ -11,6 +11,22 @@ export function SessionHistory({ sessions, players, onDeleteSession }: Props) {
     return players.find(p => p.id === playerId)?.name || 'Unknown';
   };
 
+  const formatDuration = (startTime: string, endTime?: string) => {
+    if (!endTime) return 'N/A';
+
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const durationMs = end.getTime() - start.getTime();
+
+    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
   if (sessions.length === 0) {
     return (
       <div className="space-y-6">
@@ -77,18 +93,22 @@ export function SessionHistory({ sessions, players, onDeleteSession }: Props) {
                   </div>
 
                   {/* Game Config Stats */}
-                  <div className="bg-background/50 rounded-lg p-4 border border-background-lightest space-y-3">
-                    <div>
-                      <div className="text-xs text-foreground-muted mb-1">Players</div>
-                      <div className="text-2xl font-bold text-foreground">{session.players.length}</div>
+                  <div className="bg-background/50 rounded-lg p-4 border border-background-lightest space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground-muted">Players:</span>
+                      <span className="text-lg font-bold text-foreground">{session.players.length}</span>
                     </div>
-                    <div>
-                      <div className="text-xs text-foreground-muted mb-1">Starting Chips</div>
-                      <div className="text-2xl font-bold text-foreground">{session.startingChips}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground-muted">Starting Chips:</span>
+                      <span className="text-lg font-bold text-foreground">{session.startingChips}</span>
                     </div>
-                    <div>
-                      <div className="text-xs text-foreground-muted mb-1">Conversion Rate</div>
-                      <div className="text-2xl font-bold text-poker-400">${session.conversionRate.toFixed(2)}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground-muted">Conversion Rate:</span>
+                      <span className="text-lg font-bold text-poker-400">${session.conversionRate.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground-muted">Time Played:</span>
+                      <span className="text-lg font-bold text-foreground">{formatDuration(session.date, session.endTime)}</span>
                     </div>
                   </div>
                 </div>

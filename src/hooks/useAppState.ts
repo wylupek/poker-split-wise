@@ -106,36 +106,44 @@ export function useAppState() {
   const updateSessionPlayerChips = (playerId: string, finalChips: number) => {
     if (!currentSession) return;
 
-    const updatedPlayers = currentSession.players.map(p =>
-      p.playerId === playerId ? { ...p, finalChips } : p
-    );
+    setCurrentSession(prev => {
+      if (!prev) return prev;
 
-    setCurrentSession({
-      ...currentSession,
-      players: updatedPlayers
+      const updatedPlayers = prev.players.map(p =>
+        p.playerId === playerId ? { ...p, finalChips } : p
+      );
+
+      return {
+        ...prev,
+        players: updatedPlayers
+      };
     });
   };
 
   const updateSessionPlayerChipCounts = (playerId: string, chipId: string, count: number) => {
     if (!currentSession || !currentSession.chips) return;
 
-    const updatedPlayers = currentSession.players.map(p => {
-      if (p.playerId === playerId && p.chipCounts) {
-        const newChipCounts = { ...p.chipCounts, [chipId]: count };
-        // Calculate total chips based on chip counts and chip values
-        const totalChips = Object.entries(newChipCounts).reduce((sum, [id, chipCount]) => {
-          const chip = currentSession.chips!.find(c => c.id === id);
-          return sum + (chip ? chipCount * chip.value : 0);
-        }, 0);
+    setCurrentSession(prev => {
+      if (!prev || !prev.chips) return prev;
 
-        return { ...p, chipCounts: newChipCounts, finalChips: totalChips };
-      }
-      return p;
-    });
+      const updatedPlayers = prev.players.map(p => {
+        if (p.playerId === playerId && p.chipCounts) {
+          const newChipCounts = { ...p.chipCounts, [chipId]: count };
+          // Calculate total chips based on chip counts and chip values
+          const totalChips = Object.entries(newChipCounts).reduce((sum, [id, chipCount]) => {
+            const chip = prev.chips!.find(c => c.id === id);
+            return sum + (chip ? chipCount * chip.value : 0);
+          }, 0);
 
-    setCurrentSession({
-      ...currentSession,
-      players: updatedPlayers
+          return { ...p, chipCounts: newChipCounts, finalChips: totalChips };
+        }
+        return p;
+      });
+
+      return {
+        ...prev,
+        players: updatedPlayers
+      };
     });
   };
 
@@ -145,14 +153,26 @@ export function useAppState() {
     await saveSettings(updated);
   };
 
-  const completeSession = async () => {
+  const completeSession = async (finalChipsOverride?: Record<string, number>) => {
     if (!currentSession) return;
+
+    // If finalChipsOverride is provided, use those values instead of currentSession
+    let sessionToComplete = currentSession;
+    if (finalChipsOverride) {
+      sessionToComplete = {
+        ...currentSession,
+        players: currentSession.players.map(p => ({
+          ...p,
+          finalChips: finalChipsOverride[p.playerId] ?? p.finalChips
+        }))
+      };
+    }
 
     // Calculate session results
     const results = calculateSessionResults(
-      currentSession.startingChips,
-      currentSession.conversionRate,
-      currentSession.players
+      sessionToComplete.startingChips,
+      sessionToComplete.conversionRate,
+      sessionToComplete.players
     );
 
     // Update player balances
@@ -173,8 +193,12 @@ export function useAppState() {
 
     setPlayers(updatedPlayers);
 
-    // Mark session as completed and save
-    const completedSession = { ...currentSession, completed: true };
+    // Mark session as completed and save (use sessionToComplete to preserve finalChips overrides)
+    const completedSession = {
+      ...sessionToComplete,
+      completed: true,
+      endTime: new Date().toISOString()
+    };
     await saveSession(completedSession);
     setSessions([completedSession, ...sessions]);
     setCurrentSession(null);

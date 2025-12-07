@@ -166,20 +166,15 @@ function App() {
       {/* Footer */}
       <footer className="bg-background-lighter border-t border-background-lightest mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between text-sm text-foreground-muted">
-            <div className="flex items-center space-x-6">
-              <span className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-poker-500 rounded-full animate-pulse"></span>
-                <span>Total players: <span className="text-foreground font-medium">{players.length}</span></span>
-              </span>
-              <span className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                <span>Completed sessions: <span className="text-foreground font-medium">{sessions.length}</span></span>
-              </span>
-            </div>
-            <div className="text-xs text-foreground-muted/60">
-              Local SQLite Database • All data stored securely
-            </div>
+          <div className="flex items-center justify-center space-x-6 text-sm text-foreground-muted">
+            <span className="flex items-center space-x-2">
+              <span className="w-2 h-2 bg-poker-500 rounded-full animate-pulse"></span>
+              <span>Total players: <span className="text-foreground font-medium">{players.length}</span></span>
+            </span>
+            <span className="flex items-center space-x-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              <span>Completed sessions: <span className="text-foreground font-medium">{sessions.length}</span></span>
+            </span>
           </div>
         </div>
       </footer>

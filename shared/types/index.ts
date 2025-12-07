@@ -25,7 +25,8 @@ export interface SessionPlayer {
 
 export interface GameSession {
   id: string;
-  date: string; // ISO date string
+  date: string; // ISO date string (start time)
+  endTime?: string; // ISO date string (when session was completed)
   conversionRate: number; // e.g., 0.01 means 1 chip = 1 cent
   startingChips: number; // Same for all players
   players: SessionPlayer[];
@@ -76,6 +77,7 @@ export interface DbSettings {
 export interface DbGameSession {
   id: string;
   date: string;
+  end_time: string | null;
   conversion_rate: number;
   starting_chips: number;
   chips: string; // JSON string

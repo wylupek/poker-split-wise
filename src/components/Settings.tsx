@@ -27,7 +27,7 @@ function shouldShowBorder(hexColor: string): boolean {
 function handleNumberInput(value: string, min: number = 1): number {
   // Allow empty to be treated as 0 temporarily
   if (value === '') return 0;
-  const num = parseInt(value, 10);
+  const num = parseFloat(value);
   // Only allow valid positive numbers
   if (isNaN(num) || num < 0) return min;
   return num;

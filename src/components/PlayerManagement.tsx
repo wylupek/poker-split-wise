@@ -65,7 +65,11 @@ export function PlayerManagement({ players, onAddPlayer, onRemovePlayer }: Props
         ) : (
           <div className="space-y-3">
             {players.map(player => {
-              const hasBalance = player.balance !== 0;
+              // Check if balance is effectively zero (within 1 cent)
+              const hasBalance = Math.abs(player.balance) >= 0.01;
+              // Normalize balance to avoid negative zero display
+              const normalizedBalance = Math.abs(player.balance) < 0.01 ? 0 : player.balance;
+
               return (
                 <div
                   key={player.id}
@@ -74,9 +78,9 @@ export function PlayerManagement({ players, onAddPlayer, onRemovePlayer }: Props
                   {/* Player Info */}
                   <div className="flex items-center gap-3">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${
-                      player.balance > 0
+                      normalizedBalance > 0
                         ? 'bg-gradient-to-br from-poker-600 to-poker-800'
-                        : player.balance < 0
+                        : normalizedBalance < 0
                         ? 'bg-gradient-to-br from-red-600 to-red-800'
                         : 'bg-gradient-to-br from-gray-600 to-gray-800'
                     }`}>
@@ -87,13 +91,13 @@ export function PlayerManagement({ players, onAddPlayer, onRemovePlayer }: Props
                         {player.name}
                       </div>
                       <div className={`text-sm font-medium ${
-                        player.balance > 0
+                        normalizedBalance > 0
                           ? 'text-poker-400'
-                          : player.balance < 0
+                          : normalizedBalance < 0
                           ? 'text-red-400'
                           : 'text-foreground-muted'
                       }`}>
-                        Balance: {player.balance >= 0 ? '+' : '−'} ${Math.abs(player.balance).toFixed(2)}
+                        Balance: {normalizedBalance >= 0 ? '+' : '−'} ${Math.abs(normalizedBalance).toFixed(2)}
                       </div>
                     </div>
                   </div>
