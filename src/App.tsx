@@ -4,10 +4,11 @@ import { PlayerManagement } from './components/PlayerManagement';
 import { SessionManager } from './components/SessionManager';
 import { BalanceView } from './components/BalanceView';
 import { SessionHistory } from './components/SessionHistory';
+import { Statistics } from './components/Statistics';
 import { HandRankings } from './components/HandRankings';
 import { Settings } from './components/Settings';
 
-type Tab = 'session' | 'balances' | 'history' | 'players' | 'rankings' | 'settings';
+type Tab = 'session' | 'balances' | 'history' | 'statistics' | 'players' | 'rankings' | 'settings';
 
 function App() {
   const {
@@ -59,6 +60,11 @@ function App() {
       id: 'history' as Tab,
       label: 'History',
       icon: '📊'
+    },
+    {
+      id: 'statistics' as Tab,
+      label: 'Statistics',
+      icon: '📈'
     },
     {
       id: 'players' as Tab,
@@ -151,6 +157,13 @@ function App() {
               sessions={sessions}
               players={players}
               onDeleteSession={deleteSession}
+            />
+          )}
+
+          {activeTab === 'statistics' && (
+            <Statistics
+              sessions={sessions}
+              players={players}
             />
           )}
 
