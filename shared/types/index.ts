@@ -64,6 +64,15 @@ export interface AppState {
 export interface Settings {
   defaultConversionRate: number;
   chips: Chip[];
+  defaultPresetId?: string;
+}
+
+// Chip preset interface
+export interface ChipPreset {
+  id: string;
+  name: string;
+  chips: Chip[];
+  isDefault: boolean;
 }
 
 // Database-specific types
@@ -79,6 +88,16 @@ export interface DbSettings {
   id: string;
   default_conversion_rate: number;
   chips: string; // JSON string
+  default_preset_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbChipPreset {
+  id: string;
+  name: string;
+  chips: string; // JSON string
+  is_default: number; // SQLite boolean (0 or 1)
   created_at: string;
   updated_at: string;
 }

@@ -1,6 +1,9 @@
 import { Player, GameSession, Settings } from '../../shared/types';
 import { api } from './api';
 
+// Re-export Settings type for convenience
+export type { Settings };
+
 // Players
 export async function loadPlayers(): Promise<Player[]> {
   try {

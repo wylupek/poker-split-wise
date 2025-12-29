@@ -53,6 +53,19 @@ function initializeSchema(db: Database.Database): void {
       id TEXT PRIMARY KEY,
       default_conversion_rate REAL DEFAULT 0.01,
       chips TEXT NOT NULL,
+      default_preset_id TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create chip_presets table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chip_presets (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      chips TEXT NOT NULL,
+      is_default INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
@@ -91,6 +104,15 @@ function initializeSchema(db: Database.Database): void {
     console.log('✓ Added borrow_transactions column to game_sessions table');
   }
 
+  // Migration: Add default_preset_id column to existing settings table if it doesn't exist
+  const settingsTableInfo = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+  const hasDefaultPresetId = settingsTableInfo.some(col => col.name === 'default_preset_id');
+
+  if (!hasDefaultPresetId) {
+    db.exec('ALTER TABLE settings ADD COLUMN default_preset_id TEXT');
+    console.log('✓ Added default_preset_id column to settings table');
+  }
+
   // Create indexes
   db.exec('CREATE INDEX IF NOT EXISTS idx_players_name ON players(name)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_game_sessions_date ON game_sessions(date DESC)');
@@ -116,6 +138,28 @@ function initializeSchema(db: Database.Database): void {
     );
 
     console.log('✓ Default settings created');
+  }
+
+  // Migration: Create default preset from existing settings if no presets exist
+  const presetsCount = db.prepare('SELECT COUNT(*) as count FROM chip_presets').get() as { count: number };
+
+  if (presetsCount.count === 0) {
+    const settings = db.prepare('SELECT chips FROM settings WHERE id = ?').get('default') as { chips: string } | undefined;
+
+    if (settings) {
+      const presetId = 'preset-default';
+      db.prepare('INSERT INTO chip_presets (id, name, chips, is_default) VALUES (?, ?, ?, ?)').run(
+        presetId,
+        'Default',
+        settings.chips,
+        1
+      );
+
+      // Set this preset as the default in settings
+      db.prepare('UPDATE settings SET default_preset_id = ? WHERE id = ?').run(presetId, 'default');
+
+      console.log('✓ Default chip preset created from existing settings');
+    }
   }
 }
 

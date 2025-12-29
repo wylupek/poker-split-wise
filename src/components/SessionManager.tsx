@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Player, GameSession, Chip, BorrowTransaction } from '../types';
+import { Player, GameSession, Chip, BorrowTransaction, ChipPreset } from '../types';
 import { ChipCounter } from './ChipCounter';
+import { api } from '../utils/api';
 
 interface Props {
   players: Player[];
@@ -76,6 +77,46 @@ export function SessionManager({
   const [conversionRate, setConversionRate] = useState(defaultConversionRate);
   const [inputMode, setInputMode] = useState<Record<string, 'counter' | 'total'>>({});
   const [quickTotalValues, setQuickTotalValues] = useState<Record<string, number>>({});
+  const [presets, setPresets] = useState<ChipPreset[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [isChipConfigExpanded, setIsChipConfigExpanded] = useState(false);
+
+  // Load presets on mount
+  useEffect(() => {
+    loadPresets();
+  }, []);
+
+  const loadPresets = async () => {
+    try {
+      const response = await api.get<ChipPreset[]>('/presets');
+      setPresets(response.data);
+
+      // Auto-select default preset
+      const defaultPreset = response.data.find(p => p.isDefault);
+      if (defaultPreset) {
+        setSelectedPresetId(defaultPreset.id);
+      }
+    } catch (error) {
+      console.error('Error loading presets:', error);
+    }
+  };
+
+  const handlePresetSelect = (presetId: string) => {
+    const preset = presets.find(p => p.id === presetId);
+    if (!preset) return;
+
+    setSelectedPresetId(presetId);
+
+    // If players are selected, divide chips among them
+    if (selectedPlayerIds.length > 0) {
+      setSessionChips(preset.chips.map(chip => ({
+        ...chip,
+        count: Math.floor(chip.count / selectedPlayerIds.length)
+      })));
+    } else {
+      setSessionChips([...preset.chips]);
+    }
+  };
 
   useEffect(() => {
     setSessionChips([...defaultChips]);
@@ -551,105 +592,192 @@ export function SessionManager({
 
       {/* Conversion Rate */}
       <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30">
-        <label className="block text-lg font-semibold text-foreground mb-4">
-          Conversion Rate
-        </label>
-        <div className="flex items-center gap-3">
-          <span className="text-foreground-muted">1 chip =</span>
-          <span className="text-2xl text-poker-400">$</span>
-          <input
-            type="number"
-            value={conversionRate}
-            onChange={(e) => setConversionRate(Number(e.target.value))}
-            className="w-32 bg-background border border-background-lightest rounded-lg px-4 py-2 text-foreground text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-poker-500"
-            step="0.01"
-            min="0.01"
-          />
+        <div className="grid grid-cols-3 gap-6">
+          {/* Conversion Rate Input */}
+          <div className="flex items-center gap-2">
+            <span className="text-foreground-muted text-sm whitespace-nowrap">1 chip =</span>
+            <span className="text-xl text-poker-400">$</span>
+            <input
+              type="number"
+              value={conversionRate}
+              onChange={(e) => setConversionRate(Number(e.target.value))}
+              className="w-24 bg-background border border-background-lightest rounded-lg px-3 py-2 text-foreground text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-poker-500"
+              step="0.01"
+              min="0.01"
+            />
+          </div>
+
+          {/* Per Player Value */}
+          <div className="flex items-center gap-2 justify-center border-l border-r border-background-lightest px-4">
+            {selectedPlayerIds.length > 0 ? (
+              <>
+                <span className="text-foreground-muted text-sm whitespace-nowrap">Per player:</span>
+                <span className="text-poker-400 font-bold text-xl whitespace-nowrap">
+                  {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0)} chips
+                </span>
+                <span className="text-foreground-muted text-sm">=</span>
+                <span className="text-poker-400 font-bold text-xl whitespace-nowrap">
+                  ${(sessionChips.reduce((sum, c) => sum + c.value * c.count, 0) * conversionRate).toFixed(2)}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-foreground-muted text-sm whitespace-nowrap">Per player:</span>
+                <span className="text-foreground-muted text-xl">–</span>
+              </>
+            )}
+          </div>
+
+          {/* Total Value */}
+          <div className="flex items-center gap-2 justify-end">
+            {selectedPlayerIds.length > 0 ? (
+              <>
+                <span className="text-foreground-muted text-sm whitespace-nowrap">Total:</span>
+                <span className="text-foreground font-bold text-xl whitespace-nowrap">
+                  {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0) * selectedPlayerIds.length} chips
+                </span>
+                <span className="text-foreground-muted text-sm">=</span>
+                <span className="text-foreground font-bold text-xl whitespace-nowrap">
+                  ${(sessionChips.reduce((sum, c) => sum + c.value * c.count, 0) * selectedPlayerIds.length * conversionRate).toFixed(2)}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-foreground-muted text-sm whitespace-nowrap">Total:</span>
+                <span className="text-foreground font-bold text-xl whitespace-nowrap">
+                  {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0)} chips
+                </span>
+                <span className="text-foreground-muted text-sm">=</span>
+                <span className="text-foreground font-bold text-xl whitespace-nowrap">
+                  ${(sessionChips.reduce((sum, c) => sum + c.value * c.count, 0) * conversionRate).toFixed(2)}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Chip Configuration */}
-      <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30">
-        <h3 className="text-lg font-semibold text-foreground mb-2">Chip Configuration</h3>
+      {/* Chip Configuration (Expandable) */}
+      <div className="bg-background-lightest rounded-lg border border-poker-800/30 overflow-hidden">
+        <button
+          onClick={() => setIsChipConfigExpanded(!isChipConfigExpanded)}
+          className="w-full p-6 flex items-center justify-between hover:bg-background/30 transition-all"
+        >
+          <h3 className="text-lg font-semibold text-foreground">Chip Configuration</h3>
+          <span className={`text-2xl text-foreground transition-transform ${isChipConfigExpanded ? 'rotate-180' : ''}`}>
+            ▼
+          </span>
+        </button>
 
-        {/* Summary */}
-        <div className="bg-background/50 rounded-lg p-4 mb-4 flex items-center justify-between">
-          {selectedPlayerIds.length > 0 ? (
-            <>
-              <div className="text-foreground-muted">
-                Per player: <span className="text-poker-400 font-bold text-xl ml-2">
-                  {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0)}
-                </span>
-              </div>
-              <div className="text-foreground-muted">
-                Total (all players): <span className="text-foreground font-bold text-xl ml-2">
-                  {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0) * selectedPlayerIds.length}
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="text-foreground-muted">
-              Total chip value: <span className="text-foreground font-bold text-xl ml-2">
-                {sessionChips.reduce((sum, c) => sum + c.value * c.count, 0)}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Chip List */}
-        <div className="space-y-3">
-          {sessionChips.map((chip) => (
-            <div
-              key={chip.id}
-              className="flex items-center gap-4 bg-background/50 rounded-lg p-4 hover:bg-background/70 transition-all"
-            >
-              {/* Chip Visual */}
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-lg shadow-lg flex-shrink-0"
-                style={{
-                  backgroundColor: chip.color,
-                  color: getTextColor(chip.color),
-                  border: shouldShowBorder(chip.color) ? '3px solid #333' : 'none'
-                }}
-              >
-                {chip.value}
-              </div>
-
-              {/* Chip Info */}
-              <div className="flex-1">
-                <div className="text-foreground font-medium mb-1">
-                  Value: {chip.value}
-                </div>
-                <div className="text-foreground-muted text-sm">
-                  {selectedPlayerIds.length > 0 ? 'Per player' : 'Total'}
-                </div>
-              </div>
-
-              {/* Count Input */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleChipCountChange(chip.id, Math.max(0, chip.count - 1))}
-                  className="w-8 h-8 rounded bg-background-lightest hover:bg-poker-900/30 text-foreground font-bold transition-all"
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  value={chip.count}
-                  onChange={(e) => handleChipCountChange(chip.id, Math.max(0, Number(e.target.value)))}
-                  className="w-20 bg-background border border-background-lightest rounded px-3 py-2 text-center text-foreground font-semibold focus:outline-none focus:ring-2 focus:ring-poker-500"
-                  min="0"
-                />
-                <button
-                  onClick={() => handleChipCountChange(chip.id, chip.count + 1)}
-                  className="w-8 h-8 rounded bg-background-lightest hover:bg-poker-900/30 text-foreground font-bold transition-all"
-                >
-                  +
-                </button>
+        {isChipConfigExpanded && (
+          <div className="px-6 pb-6 space-y-6">
+            {/* Preset Selection */}
+            <div>
+              <label className="block text-sm font-medium text-foreground-muted mb-3">
+                Select Preset
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {presets.map(preset => (
+                  <button
+                    key={preset.id}
+                    onClick={() => handlePresetSelect(preset.id)}
+                    className={`
+                      p-3 rounded-lg border-2 transition-all text-left
+                      ${
+                        selectedPresetId === preset.id
+                          ? 'border-poker-500 bg-poker-500/10'
+                          : 'border-background-lightest bg-background/50 hover:border-poker-700/50'
+                      }
+                    `}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm text-foreground">{preset.name}</span>
+                      {preset.isDefault && (
+                        <span className="text-xs bg-poker-600 text-white px-1.5 py-0.5 rounded">Default</span>
+                      )}
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {preset.chips.slice(0, Math.min(preset.chips.length <= 6 ? 6 : 5, preset.chips.length)).map(chip => (
+                        <div
+                          key={chip.id}
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{
+                            backgroundColor: chip.color,
+                            border: shouldShowBorder(chip.color) ? '1px solid #333' : 'none',
+                            color: getTextColor(chip.color)
+                          }}
+                          title={`${chip.value}`}
+                        >
+                          {chip.value > 99 ? '⋯' : chip.value}
+                        </div>
+                      ))}
+                      {preset.chips.length > 6 && (
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-background-lightest text-foreground-muted">
+                          +{preset.chips.length - 5}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+
+            {/* Chip List */}
+            <div>
+              <label className="block text-sm font-medium text-foreground-muted mb-3">
+                Chips {selectedPlayerIds.length > 0 && `(per player)`}
+              </label>
+              <div className="space-y-3">
+                {sessionChips.map((chip) => (
+                  <div
+                    key={chip.id}
+                    className="flex items-center gap-4 bg-background/50 rounded-lg p-3 hover:bg-background/70 transition-all"
+                  >
+                    {/* Chip Visual */}
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm shadow-lg flex-shrink-0"
+                      style={{
+                        backgroundColor: chip.color,
+                        color: getTextColor(chip.color),
+                        border: shouldShowBorder(chip.color) ? '2px solid #333' : 'none'
+                      }}
+                    >
+                      {chip.value}
+                    </div>
+
+                    {/* Chip Info */}
+                    <div className="flex-1">
+                      <div className="text-foreground font-medium">Value: {chip.value}</div>
+                    </div>
+
+                    {/* Count Input */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleChipCountChange(chip.id, Math.max(0, chip.count - 1))}
+                        className="w-8 h-8 rounded bg-background-lightest hover:bg-poker-900/30 text-foreground font-bold transition-all"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        value={chip.count}
+                        onChange={(e) => handleChipCountChange(chip.id, Math.max(0, Number(e.target.value)))}
+                        className="w-16 bg-background border border-background-lightest rounded px-2 py-2 text-center text-foreground font-semibold focus:outline-none focus:ring-2 focus:ring-poker-500"
+                        min="0"
+                      />
+                      <button
+                        onClick={() => handleChipCountChange(chip.id, chip.count + 1)}
+                        className="w-8 h-8 rounded bg-background-lightest hover:bg-poker-900/30 text-foreground font-bold transition-all"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Start Button */}

@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import playerRoutes from './routes/players.js';
 import sessionRoutes from './routes/sessions.js';
 import settingsRoutes from './routes/settings.js';
+import presetsRoutes from './routes/presets.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { getDatabase } from './config/database.js';
 
@@ -37,6 +38,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/players', playerRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/presets', presetsRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

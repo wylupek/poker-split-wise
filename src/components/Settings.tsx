@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Chip } from '../types';
+import { Chip, ChipPreset } from '../types';
 import { Settings as SettingsType } from '../utils/storage';
+import { api } from '../utils/api';
 
 interface Props {
   settings: SettingsType;
@@ -23,12 +24,9 @@ function shouldShowBorder(hexColor: string): boolean {
   return luminance > 0.85;
 }
 
-// Shared number input handler
 function handleNumberInput(value: string, min: number = 1): number {
-  // Allow empty to be treated as 0 temporarily
   if (value === '') return 0;
   const num = parseFloat(value);
-  // Only allow valid positive numbers
   if (isNaN(num) || num < 0) return min;
   return num;
 }
@@ -38,18 +36,93 @@ function enforceMinimum(value: number, min: number = 1): number {
 }
 
 export function Settings({ settings, onUpdateSettings }: Props) {
-  const [chips, setChips] = useState<Chip[]>(settings.chips || []);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [presets, setPresets] = useState<ChipPreset[]>([]);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [editingChips, setEditingChips] = useState<Chip[]>([]);
+  const [editingName, setEditingName] = useState('');
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
 
-  // Sync local state with settings prop
   useEffect(() => {
-    if (settings.chips && !hasChanges) {
-      setChips(settings.chips);
+    loadPresets();
+  }, []);
+
+  const loadPresets = async () => {
+    try {
+      const response = await api.get<ChipPreset[]>('/presets');
+      setPresets(response.data);
+    } catch (error) {
+      console.error('Error loading presets:', error);
     }
-  }, [settings.chips, hasChanges]);
+  };
+
+  const startEditing = (preset: ChipPreset) => {
+    setEditingPresetId(preset.id);
+    setEditingChips([...preset.chips]);
+    setEditingName(preset.name);
+  };
+
+  const cancelEditing = () => {
+    setEditingPresetId(null);
+    setEditingChips([]);
+    setEditingName('');
+  };
+
+  const savePreset = async (presetId: string) => {
+    try {
+      const response = await api.put<ChipPreset>(`/presets/${presetId}`, {
+        name: editingName,
+        chips: editingChips
+      });
+      setPresets(presets.map(p => (p.id === presetId ? response.data : p)));
+      setEditingPresetId(null);
+    } catch (error) {
+      console.error('Error updating preset:', error);
+    }
+  };
+
+  const createPreset = async () => {
+    if (!newPresetName.trim()) return;
+
+    const defaultChips: Chip[] = [
+      { id: `chip-${Date.now()}-1`, label: '5', color: '#FFFFFF', value: 5, count: 20 },
+      { id: `chip-${Date.now()}-2`, label: '25', color: '#2E7D32', value: 25, count: 20 },
+      { id: `chip-${Date.now()}-3`, label: '100', color: '#FBC02D', value: 100, count: 20 }
+    ];
+
+    try {
+      const response = await api.post<ChipPreset>('/presets', {
+        name: newPresetName.trim(),
+        chips: defaultChips
+      });
+      setPresets([...presets, response.data]);
+      setNewPresetName('');
+      setIsCreatingNew(false);
+    } catch (error) {
+      console.error('Error creating preset:', error);
+    }
+  };
+
+  const deletePreset = async (presetId: string) => {
+    try {
+      await api.delete(`/presets/${presetId}`);
+      setPresets(presets.filter(p => p.id !== presetId));
+    } catch (error: any) {
+      console.error('Error deleting preset:', error);
+    }
+  };
+
+  const setDefaultPreset = async (presetId: string) => {
+    try {
+      await api.put(`/presets/${presetId}/set-default`);
+      setPresets(presets.map(p => ({ ...p, isDefault: p.id === presetId })));
+    } catch (error) {
+      console.error('Error setting default preset:', error);
+    }
+  };
 
   const handleAddChip = () => {
-    const defaultValue = (chips.length + 1) * 10;
+    const defaultValue = (editingChips.length + 1) * 10;
     const newChip: Chip = {
       id: `chip-${Date.now()}`,
       label: `${defaultValue}`,
@@ -57,58 +130,41 @@ export function Settings({ settings, onUpdateSettings }: Props) {
       value: defaultValue,
       count: 20
     };
-    setChips([...chips, newChip]);
-    setHasChanges(true);
+    setEditingChips([...editingChips, newChip]);
   };
 
   const handleDeleteChip = (chipId: string) => {
-    if (chips.length <= 1) {
-      alert('You must have at least one chip type');
-      return;
-    }
-    setChips(chips.filter(c => c.id !== chipId));
-    setHasChanges(true);
+    if (editingChips.length <= 1) return;
+    setEditingChips(editingChips.filter(c => c.id !== chipId));
   };
 
   const handleUpdateChip = (chipId: string, updates: Partial<Chip>) => {
-    setChips(chips.map(c => {
-      if (c.id === chipId) {
-        const updated = { ...c, ...updates };
-        // Auto-update label when value changes
-        if (updates.value !== undefined) {
-          updated.label = `${updates.value}`;
+    setEditingChips(
+      editingChips.map(c => {
+        if (c.id === chipId) {
+          const updated = { ...c, ...updates };
+          if (updates.value !== undefined) {
+            updated.label = `${updates.value}`;
+          }
+          return updated;
         }
-        return updated;
-      }
-      return c;
-    }));
-    setHasChanges(true);
+        return c;
+      })
+    );
   };
 
   const handleMoveUp = (index: number) => {
     if (index === 0) return;
-    const newChips = [...chips];
+    const newChips = [...editingChips];
     [newChips[index - 1], newChips[index]] = [newChips[index], newChips[index - 1]];
-    setChips(newChips);
-    setHasChanges(true);
+    setEditingChips(newChips);
   };
 
   const handleMoveDown = (index: number) => {
-    if (index === chips.length - 1) return;
-    const newChips = [...chips];
+    if (index === editingChips.length - 1) return;
+    const newChips = [...editingChips];
     [newChips[index], newChips[index + 1]] = [newChips[index + 1], newChips[index]];
-    setChips(newChips);
-    setHasChanges(true);
-  };
-
-  const handleSave = () => {
-    onUpdateSettings({ chips });
-    setHasChanges(false);
-  };
-
-  const handleReset = () => {
-    setChips(settings.chips);
-    setHasChanges(false);
+    setEditingChips(newChips);
   };
 
   return (
@@ -118,150 +174,257 @@ export function Settings({ settings, onUpdateSettings }: Props) {
         Settings
       </h2>
 
-      {/* Chip Configuration Section */}
+      {/* Chip Presets Management */}
       <div className="bg-background-lightest rounded-lg p-6 border border-poker-800/30 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Chip Configuration</h3>
+            <h3 className="text-lg font-semibold text-foreground">Chip Presets</h3>
             <p className="text-sm text-foreground-muted mt-1">
-              Configure your chip types. These settings will apply to all new sessions.
+              Manage your chip set configurations. Select a preset when starting a new session.
             </p>
           </div>
           <button
-            onClick={handleAddChip}
+            onClick={() => setIsCreatingNew(true)}
             className="px-4 py-2 rounded-lg font-medium bg-poker-500 hover:bg-poker-600 text-white shadow-glow-sm hover:shadow-glow transition-all"
           >
-            + Add Chip
+            + New Preset
           </button>
         </div>
 
-        {/* Chip List */}
-        <div className="space-y-3 mt-6">
-          {chips.map((chip, index) => (
-            <div
-              key={chip.id}
-              className="flex items-center gap-4 p-4 bg-background/50 rounded-lg border border-background-lightest hover:border-poker-700/50 transition-all"
-            >
-              {/* Chip Visual */}
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-xl shadow-lg flex-shrink-0"
-                style={{
-                  backgroundColor: chip.color,
-                  border: shouldShowBorder(chip.color) ? '3px solid #333' : 'none',
-                  color: getTextColor(chip.color)
-                }}
+        {/* Create New Preset Form */}
+        {isCreatingNew && (
+          <div className="bg-background/50 rounded-lg p-4 border border-poker-500 space-y-3">
+            <input
+              type="text"
+              value={newPresetName}
+              onChange={e => setNewPresetName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') createPreset();
+                if (e.key === 'Escape') {
+                  setIsCreatingNew(false);
+                  setNewPresetName('');
+                }
+              }}
+              placeholder="Enter preset name..."
+              className="w-full bg-background border border-background-lightest rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={createPreset}
+                className="px-4 py-2 bg-poker-500 hover:bg-poker-600 text-white rounded-lg font-medium transition-all"
               >
-                {chip.value}
-              </div>
+                Create
+              </button>
+              <button
+                onClick={() => {
+                  setIsCreatingNew(false);
+                  setNewPresetName('');
+                }}
+                className="px-4 py-2 bg-background-lightest hover:bg-background text-foreground rounded-lg font-medium transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
-              {/* Inputs */}
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs text-foreground-muted mb-1 block">Value</label>
-                  <input
-                    type="number"
-                    value={chip.value || ''}
-                    onChange={(e) => {
-                      handleUpdateChip(chip.id, { value: handleNumberInput(e.target.value, 1) });
-                    }}
-                    onBlur={() => {
-                      handleUpdateChip(chip.id, { value: enforceMinimum(chip.value, 1) });
-                    }}
-                    className="w-full bg-background border border-background-lightest rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500 focus:border-poker-500"
-                    min="1"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-foreground-muted mb-1 block">Count</label>
-                  <input
-                    type="number"
-                    value={chip.count || ''}
-                    onChange={(e) => {
-                      handleUpdateChip(chip.id, { count: handleNumberInput(e.target.value, 1) });
-                    }}
-                    onBlur={() => {
-                      handleUpdateChip(chip.id, { count: enforceMinimum(chip.count, 1) });
-                    }}
-                    className="w-full bg-background border border-background-lightest rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500 focus:border-poker-500"
-                    min="1"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-foreground-muted mb-1 block">Color</label>
-                  <div className="relative w-full h-[42px] rounded-lg overflow-hidden">
+        {/* Presets List */}
+        <div className="space-y-3">
+          {presets.map(preset => (
+            <div
+              key={preset.id}
+              className="bg-background/50 rounded-lg border border-background-lightest overflow-hidden"
+            >
+              {editingPresetId === preset.id ? (
+                /* Edit Mode */
+                <div className="p-4 space-y-4">
+                  {/* Preset Name Input */}
+                  <div className="flex items-center gap-3">
                     <input
-                      type="color"
-                      value={chip.color}
-                      onChange={(e) => handleUpdateChip(chip.id, { color: e.target.value })}
-                      className="absolute inset-0 w-full h-full cursor-pointer"
-                      style={{ padding: 0, border: 'none', outline: 'none' }}
+                      type="text"
+                      value={editingName}
+                      onChange={e => setEditingName(e.target.value)}
+                      className="flex-1 bg-background border border-poker-500 rounded-lg px-4 py-2 text-foreground font-semibold focus:outline-none focus:ring-2 focus:ring-poker-500"
                     />
+                    <button
+                      onClick={handleAddChip}
+                      className="px-3 py-2 rounded-lg font-medium bg-poker-500 hover:bg-poker-600 text-white transition-all"
+                    >
+                      + Add Chip
+                    </button>
+                  </div>
+
+                  {/* Chips Editor */}
+                  <div className="space-y-2">
+                    {editingChips.map((chip, index) => (
+                      <div
+                        key={chip.id}
+                        className="flex items-center gap-4 p-3 bg-background rounded-lg border border-background-lightest"
+                      >
+                        {/* Chip Visual */}
+                        <div
+                          className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm shadow-lg flex-shrink-0"
+                          style={{
+                            backgroundColor: chip.color,
+                            border: shouldShowBorder(chip.color) ? '2px solid #333' : 'none',
+                            color: getTextColor(chip.color)
+                          }}
+                        >
+                          {chip.value}
+                        </div>
+
+                        {/* Inputs */}
+                        <div className="flex-1 grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-xs text-foreground-muted mb-1 block">Value</label>
+                            <input
+                              type="number"
+                              value={chip.value || ''}
+                              onChange={e => handleUpdateChip(chip.id, { value: handleNumberInput(e.target.value, 1) })}
+                              onBlur={() => handleUpdateChip(chip.id, { value: enforceMinimum(chip.value, 1) })}
+                              className="w-full bg-background border border-background-lightest rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500"
+                              min="1"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs text-foreground-muted mb-1 block">Count</label>
+                            <input
+                              type="number"
+                              value={chip.count || ''}
+                              onChange={e => handleUpdateChip(chip.id, { count: handleNumberInput(e.target.value, 1) })}
+                              onBlur={() => handleUpdateChip(chip.id, { count: enforceMinimum(chip.count, 1) })}
+                              className="w-full bg-background border border-background-lightest rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-poker-500"
+                              min="1"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs text-foreground-muted mb-1 block">Color</label>
+                            <input
+                              type="color"
+                              value={chip.color}
+                              onChange={e => handleUpdateChip(chip.id, { color: e.target.value })}
+                              className="w-full h-8 rounded cursor-pointer"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => handleMoveUp(index)}
+                            disabled={index === 0}
+                            className={`w-8 h-8 rounded flex items-center justify-center ${
+                              index === 0
+                                ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
+                                : 'bg-background-lightest text-foreground hover:bg-poker-500/20'
+                            }`}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => handleMoveDown(index)}
+                            disabled={index === editingChips.length - 1}
+                            className={`w-8 h-8 rounded flex items-center justify-center ${
+                              index === editingChips.length - 1
+                                ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
+                                : 'bg-background-lightest text-foreground hover:bg-poker-500/20'
+                            }`}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            onClick={() => handleDeleteChip(chip.id)}
+                            disabled={editingChips.length <= 1}
+                            className={`w-8 h-8 rounded flex items-center justify-center ${
+                              editingChips.length <= 1
+                                ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
+                                : 'bg-red-600/20 text-red-400 hover:bg-red-600/30'
+                            }`}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Save/Cancel Buttons */}
+                  <div className="flex gap-2 pt-2 border-t border-background-lightest">
+                    <button
+                      onClick={() => savePreset(preset.id)}
+                      className="flex-1 px-4 py-2 rounded-lg font-semibold bg-poker-500 hover:bg-poker-600 text-white transition-all"
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={cancelEditing}
+                      className="px-4 py-2 rounded-lg font-medium bg-background-lightest hover:bg-background text-foreground transition-all"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* View Mode */
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="text-lg font-semibold text-foreground">{preset.name}</h4>
+                        {preset.isDefault && (
+                          <span className="text-xs bg-poker-600 text-white px-2 py-0.5 rounded">Default</span>
+                        )}
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        {preset.chips.map(chip => (
+                          <div
+                            key={chip.id}
+                            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shadow-md"
+                            style={{
+                              backgroundColor: chip.color,
+                              border: shouldShowBorder(chip.color) ? '2px solid #333' : 'none',
+                              color: getTextColor(chip.color)
+                            }}
+                            title={`Value: ${chip.value}, Count: ${chip.count}`}
+                          >
+                            {chip.value}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-              {/* Actions */}
-              <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => handleMoveUp(index)}
-                  disabled={index === 0}
-                  title="Move up"
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
-                    index === 0
-                      ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
-                      : 'bg-background-lightest text-foreground hover:bg-poker-500/20 hover:text-poker-400 border border-poker-700/50'
-                  }`}
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={() => handleMoveDown(index)}
-                  disabled={index === chips.length - 1}
-                  title="Move down"
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
-                    index === chips.length - 1
-                      ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
-                      : 'bg-background-lightest text-foreground hover:bg-poker-500/20 hover:text-poker-400 border border-poker-700/50'
-                  }`}
-                >
-                  ↓
-                </button>
-                <button
-                  onClick={() => handleDeleteChip(chip.id)}
-                  disabled={chips.length <= 1}
-                  title="Delete"
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all text-lg ${
-                    chips.length <= 1
-                      ? 'bg-background-lightest text-foreground-muted cursor-not-allowed opacity-50'
-                      : 'bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-700/50'
-                  }`}
-                >
-                  ×
-                </button>
-              </div>
+                    <div className="flex gap-2">
+                      {!preset.isDefault && (
+                        <button
+                          onClick={() => setDefaultPreset(preset.id)}
+                          className="px-3 py-2 bg-background-lightest hover:bg-poker-500/20 text-foreground rounded-lg text-sm transition-all"
+                          title="Set as default"
+                        >
+                          Set Default
+                        </button>
+                      )}
+                      <button
+                        onClick={() => startEditing(preset)}
+                        className="px-3 py-2 bg-poker-500/20 hover:bg-poker-500/30 text-poker-400 rounded-lg text-sm transition-all"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deletePreset(preset.id)}
+                        className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm transition-all"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
-
-        {/* Save/Cancel Buttons */}
-        {hasChanges && (
-          <div className="flex gap-3 mt-6 pt-4 border-t border-background-lightest">
-            <button
-              onClick={handleSave}
-              className="flex-1 px-6 py-3 rounded-lg font-semibold bg-poker-500 hover:bg-poker-600 text-white shadow-glow-sm hover:shadow-glow transition-all"
-            >
-              Save Chip Configuration
-            </button>
-            <button
-              onClick={handleReset}
-              className="px-6 py-3 rounded-lg font-medium bg-background-lightest hover:bg-background text-foreground border border-background-lightest transition-all"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Default Session Settings Section */}
@@ -274,7 +437,7 @@ export function Settings({ settings, onUpdateSettings }: Props) {
           <input
             type="number"
             value={settings.defaultConversionRate || ''}
-            onChange={(e) => {
+            onChange={e => {
               const val = handleNumberInput(e.target.value, 0.01);
               onUpdateSettings({ defaultConversionRate: val });
             }}
