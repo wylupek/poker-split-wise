@@ -16,6 +16,7 @@ dotenv.config({ path: '../.env' });
 const app = express();
 const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [FRONTEND_URL];
 
 // Initialize database on startup
 getDatabase();
@@ -23,7 +24,9 @@ getDatabase();
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: process.env.NODE_ENV === 'development'
+    ? (origin, callback) => callback(null, true) // Allow all origins in development
+    : ALLOWED_ORIGINS,
   credentials: true
 }));
 app.use(morgan('dev'));
@@ -44,8 +47,9 @@ app.use('/api/presets', presetsRoutes);
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📡 API available at http://localhost:${PORT}/api`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🚀 Server running on http://0.0.0.0:${PORT}`);
+  console.log(`📡 API available at http://0.0.0.0:${PORT}/api`);
+  console.log(`🌐 Local network: http://192.168.1.100:${PORT}`);
   console.log(`🎯 Frontend URL: ${FRONTEND_URL}\n`);
 });
