@@ -35,7 +35,33 @@ npm install
 cd ..
 ```
 
-### Development
+### Quick Start (Background Mode)
+
+Use the provided scripts to run the app in the background:
+
+```bash
+# Start the app (runs in background)
+./start.sh
+
+# Stop the app
+./stop.sh
+```
+
+The scripts will:
+- Run silently in the background (no terminal required)
+- Show desktop notifications for status updates
+- Log all output to `app-control.log`, `backend.log`, and `frontend.log`
+- Safely manage processes (won't kill your browser)
+- Display the network URL for accessing from other devices
+
+**View logs:**
+```bash
+tail -f app-control.log   # Start/stop operations
+tail -f backend.log        # Backend server output
+tail -f frontend.log       # Frontend server output
+```
+
+### Development (Interactive Mode)
 
 ```bash
 # Run both frontend and backend concurrently

@@ -1,103 +1,111 @@
 #!/bin/bash
 
-# Poker Split-Wise - Start Script
-# Starts both frontend and backend servers in the background
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$SCRIPT_DIR/.app.pid"
+CONTROL_LOG="$SCRIPT_DIR/app-control.log"
 
-# Change to script directory to ensure relative paths work
 cd "$SCRIPT_DIR"
 
-# Source nvm if it exists (for double-click execution)
+log() {
+    echo -e "$@" >> "$CONTROL_LOG"
+}
+
+echo "" >> "$CONTROL_LOG"
+echo "================================================" >> "$CONTROL_LOG"
+echo "START - $(date)" >> "$CONTROL_LOG"
+echo "================================================" >> "$CONTROL_LOG"
+
 if [ -f "$HOME/.nvm/nvm.sh" ]; then
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 fi
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+log "🚀 Starting Poker Split-Wise..."
 
-echo -e "${GREEN}🚀 Starting Poker Split-Wise...${NC}"
-
-# Check if already running
 if [ -f "$PID_FILE" ]; then
-    echo -e "${YELLOW}⚠️  App might already be running. Checking...${NC}"
+    log "⚠️  App might already be running. Checking..."
     if ps -p $(cat "$PID_FILE" 2>/dev/null | head -n1) > /dev/null 2>&1; then
-        echo -e "${RED}❌ App is already running!${NC}"
-        echo -e "${YELLOW}Run ./stop.sh first to stop it.${NC}"
+        log "❌ App is already running!"
+        log "💡 Run ./stop.sh first to stop it."
+
+        if command -v notify-send &> /dev/null; then
+            notify-send "Poker Split-Wise" "App is already running" --icon=dialog-warning
+        fi
         exit 1
     else
-        echo -e "${YELLOW}Stale PID file found. Cleaning up...${NC}"
+        log "Stale PID file found. Cleaning up..."
         rm "$PID_FILE"
     fi
 fi
+check_port() {
+    local port=$1
+    local port_name=$2
 
-# Check if ports are available
-if lsof -Pi :3001 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo -e "${RED}❌ Port 3001 is already in use!${NC}"
-    echo -e "${YELLOW}Another app is using the backend port.${NC}"
-    exit 1
-fi
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        local pid=$(lsof -ti :$port 2>/dev/null | head -n1)
+        local cmd=$(ps -p $pid -o comm= 2>/dev/null)
 
-if lsof -Pi :5173 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo -e "${RED}❌ Port 5173 is already in use!${NC}"
-    echo -e "${YELLOW}Another app is using the frontend port.${NC}"
-    exit 1
-fi
+        log "❌ Port $port ($port_name) is already in use!"
+        log "   Process: $cmd (PID: $pid)"
 
-# Start backend server
+        if [[ "$cmd" =~ ^(node|npm|vite)$ ]]; then
+            log "💡 This looks like the poker app. Run ./stop.sh to stop it."
+
+            if command -v notify-send &> /dev/null; then
+                notify-send "Poker Split-Wise" "Port $port already in use by poker app" --icon=dialog-error
+            fi
+        else
+            log "💡 This is NOT the poker app. Close that app first or change the port."
+
+            if command -v notify-send &> /dev/null; then
+                notify-send "Poker Split-Wise" "Port $port in use by another app: $cmd" --icon=dialog-error
+            fi
+        fi
+
+        return 1
+    fi
+
+    return 0
+}
+
+check_port 3001 "backend" || exit 1
+check_port 5173 "frontend" || exit 1
+
 cd "$SCRIPT_DIR/server"
-echo -e "${GREEN}📡 Starting backend server...${NC}"
-nohup npm run dev > "$SCRIPT_DIR/backend.log" 2>&1 &
+log "📡 Starting backend server..."
+nohup npm run dev > "$SCRIPT_DIR/backend.log" 2>&1 < /dev/null &
 BACKEND_PID=$!
 
-# Wait a moment for backend to initialize
 sleep 2
 
-# Start frontend server
 cd "$SCRIPT_DIR"
-echo -e "${GREEN}🎨 Starting frontend server...${NC}"
-nohup npm run dev:client > "$SCRIPT_DIR/frontend.log" 2>&1 &
+log "🎨 Starting frontend server..."
+nohup npm run dev:client > "$SCRIPT_DIR/frontend.log" 2>&1 < /dev/null &
 FRONTEND_PID=$!
 
-# Save PIDs
 echo "$BACKEND_PID" > "$PID_FILE"
 echo "$FRONTEND_PID" >> "$PID_FILE"
 
-# Wait a moment for servers to start
 sleep 3
 
-# Check if processes are still running
 if ps -p $BACKEND_PID > /dev/null && ps -p $FRONTEND_PID > /dev/null; then
-    echo -e "${GREEN}✅ App started successfully!${NC}"
-    echo ""
-    echo -e "${GREEN}🌐 Frontend: ${NC}http://localhost:5173"
-    echo -e "${GREEN}📡 Backend:  ${NC}http://localhost:3001/api"
-    echo -e "${GREEN}💾 Database: ${NC}$SCRIPT_DIR/data/poker-splitwise.db"
-    echo ""
-    echo -e "${YELLOW}📋 Logs:${NC}"
-    echo -e "   Backend:  tail -f $SCRIPT_DIR/backend.log"
-    echo -e "   Frontend: tail -f $SCRIPT_DIR/frontend.log"
-    echo ""
-    echo -e "${YELLOW}🛑 To stop: ${NC}./stop.sh"
+    LOCAL_IP=$(hostname -I | awk '{print $1}')
+    log "✅ App started successfully!"
+    log ""
+    log "🌐 Frontend: http://localhost:5173"
+    log "📡 Backend:  http://localhost:3001/api"
+    log "🌐 Network:  http://$LOCAL_IP:5173"
+    log "💾 Database: $SCRIPT_DIR/data/poker-splitwise.db"
 
-    # Send desktop notification if available
     if command -v notify-send &> /dev/null; then
-        notify-send "Poker Split-Wise Started" "App running at http://localhost:5173" --icon=applications-games
+        notify-send "Poker Split-Wise" "App is running at http://$LOCAL_IP:5173" --icon=applications-games
     fi
 else
-    echo -e "${RED}❌ Failed to start. Check logs:${NC}"
-    echo -e "   Backend:  tail $SCRIPT_DIR/backend.log"
-    echo -e "   Frontend: tail $SCRIPT_DIR/frontend.log"
+    log "❌ Failed to start. Check logs for details."
     rm "$PID_FILE"
 
-    # Send desktop notification if available
     if command -v notify-send &> /dev/null; then
-        notify-send "Poker Split-Wise Failed" "Check logs: backend.log and frontend.log" --icon=dialog-error --urgency=critical
+        notify-send "Poker Split-Wise" "Failed to start. Check logs" --icon=dialog-error --urgency=critical
     fi
 
     exit 1

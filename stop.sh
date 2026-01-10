@@ -1,126 +1,153 @@
 #!/bin/bash
 
-# Poker Split-Wise - Stop Script
-# Stops ONLY the poker app servers - NEVER kills browser or other apps
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$SCRIPT_DIR/.app.pid"
+CONTROL_LOG="$SCRIPT_DIR/app-control.log"
 
-# Change to script directory
 cd "$SCRIPT_DIR"
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+log() {
+    echo -e "$@" >> "$CONTROL_LOG"
+}
 
-echo -e "${YELLOW}🛑 Stopping Poker Split-Wise...${NC}"
+echo "" >> "$CONTROL_LOG"
+echo "================================================" >> "$CONTROL_LOG"
+echo "STOP - $(date)" >> "$CONTROL_LOG"
+echo "================================================" >> "$CONTROL_LOG"
 
-# Function to kill process tree (parent + all children)
+log "🛑 Stopping Poker Split-Wise..."
 kill_tree() {
     local pid=$1
     local sig=${2:-TERM}
 
-    # Find all child PIDs recursively
+    if ! ps -p $pid > /dev/null 2>&1; then
+        return
+    fi
+
     local children=$(pgrep -P $pid 2>/dev/null)
 
-    # Kill children first
-    for child in $children; do
-        kill_tree $child $sig
-    done
-
-    # Kill the parent
-    if ps -p $pid > /dev/null 2>&1; then
-        kill -$sig $pid 2>/dev/null
+    if [ -n "$children" ]; then
+        for child in $children; do
+            kill_tree $child $sig
+        done
     fi
+
+    kill -$sig $pid 2>/dev/null
 }
+kill_port_processes() {
+    local port=$1
+    local pids=$(lsof -ti :$port 2>/dev/null)
 
-# Check if PID file exists
+    if [ -z "$pids" ]; then
+        return
+    fi
+
+    for pid in $pids; do
+        local cmd=$(ps -p $pid -o comm= 2>/dev/null)
+
+        if [[ "$cmd" =~ ^(node|npm|vite)$ ]]; then
+            log "  Killing $cmd process (PID: $pid) on port $port"
+            kill -TERM $pid 2>/dev/null
+            sleep 1
+
+            if ps -p $pid > /dev/null 2>&1; then
+                kill -KILL $pid 2>/dev/null
+            fi
+        else
+            log "⚠️  WARNING: Skipping non-node process '$cmd' (PID: $pid) on port $port"
+            log "   This might be your browser or another app. NOT killing it!"
+        fi
+    done
+}
 if [ ! -f "$PID_FILE" ]; then
-    echo -e "${RED}❌ App is not running (no PID file found)${NC}"
+    log "⚠️  No PID file found. Checking for orphaned processes..."
 
-    # Send notification
-    if command -v notify-send &> /dev/null; then
-        notify-send "Poker Split-Wise" "App was not running" --icon=dialog-information
+    backend_pids=$(lsof -ti :3001 2>/dev/null)
+    frontend_pids=$(lsof -ti :5173 2>/dev/null)
+
+    if [ -n "$backend_pids" ] || [ -n "$frontend_pids" ]; then
+        log "Found processes on poker app ports. Cleaning up..."
+        kill_port_processes 3001
+        kill_port_processes 5173
+        log "✅ Cleaned up orphaned processes"
+
+        if command -v notify-send &> /dev/null; then
+            notify-send "Poker Split-Wise" "Cleaned up orphaned processes" --icon=dialog-information
+        fi
+    else
+        log "❌ App is not running"
+
+        if command -v notify-send &> /dev/null; then
+            notify-send "Poker Split-Wise" "App is not running" --icon=dialog-information
+        fi
     fi
 
     exit 0
 fi
 
-# Read PIDs from file
 BACKEND_PID=$(head -n1 "$PID_FILE")
 FRONTEND_PID=$(tail -n1 "$PID_FILE")
 
 STOPPED=0
-
-# Stop backend server
 if [ -n "$BACKEND_PID" ] && ps -p $BACKEND_PID > /dev/null 2>&1; then
-    echo -e "${GREEN}📡 Stopping backend server (PID: $BACKEND_PID)...${NC}"
+    log "📡 Stopping backend server (PID: $BACKEND_PID)..."
     kill_tree $BACKEND_PID TERM
 
-    # Wait up to 5 seconds for graceful shutdown
     for i in {1..5}; do
         if ! ps -p $BACKEND_PID > /dev/null 2>&1; then
-            echo -e "${GREEN}✓ Backend stopped${NC}"
+            log "✓ Backend stopped"
             STOPPED=$((STOPPED + 1))
             break
         fi
         sleep 1
     done
 
-    # Force kill if still running
     if ps -p $BACKEND_PID > /dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  Force killing backend...${NC}"
+        log "⚠️  Force killing backend..."
         kill_tree $BACKEND_PID KILL
         STOPPED=$((STOPPED + 1))
     fi
 else
-    echo -e "${YELLOW}⚠️  Backend not running${NC}"
+    log "⚠️  Backend not running"
 fi
 
-# Stop frontend server
 if [ -n "$FRONTEND_PID" ] && ps -p $FRONTEND_PID > /dev/null 2>&1; then
-    echo -e "${GREEN}🎨 Stopping frontend server (PID: $FRONTEND_PID)...${NC}"
+    log "🎨 Stopping frontend server (PID: $FRONTEND_PID)..."
     kill_tree $FRONTEND_PID TERM
 
-    # Wait up to 5 seconds for graceful shutdown
     for i in {1..5}; do
         if ! ps -p $FRONTEND_PID > /dev/null 2>&1; then
-            echo -e "${GREEN}✓ Frontend stopped${NC}"
+            log "✓ Frontend stopped"
             STOPPED=$((STOPPED + 1))
             break
         fi
         sleep 1
     done
 
-    # Force kill if still running
     if ps -p $FRONTEND_PID > /dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  Force killing frontend...${NC}"
+        log "⚠️  Force killing frontend..."
         kill_tree $FRONTEND_PID KILL
         STOPPED=$((STOPPED + 1))
     fi
 else
-    echo -e "${YELLOW}⚠️  Frontend not running${NC}"
+    log "⚠️  Frontend not running"
 fi
 
-# Clean up PID file
+kill_port_processes 3001
+kill_port_processes 5173
+
 rm "$PID_FILE"
-
-# Final status
-echo ""
+log ""
 if [ $STOPPED -gt 0 ]; then
-    echo -e "${GREEN}✅ App stopped successfully!${NC}"
+    log "✅ App stopped successfully!"
 
-    # Send notification
     if command -v notify-send &> /dev/null; then
-        notify-send "Poker Split-Wise Stopped" "App has been shut down" --icon=application-exit
+        notify-send "Poker Split-Wise" "App stopped" --icon=application-exit
     fi
 else
-    echo -e "${YELLOW}✓ App was not running${NC}"
+    log "✓ App was not running"
 
-    # Send notification
     if command -v notify-send &> /dev/null; then
-        notify-send "Poker Split-Wise" "App was not running" --icon=dialog-information
+        notify-send "Poker Split-Wise" "App is not running" --icon=dialog-information
     fi
 fi
