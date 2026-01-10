@@ -3,6 +3,9 @@ import { Player, GameSession, Chip, BorrowTransaction, ChipPreset } from '../typ
 import { ChipCounter } from './ChipCounter';
 import { api } from '../utils/api';
 import { generateUUID } from '../utils/uuid';
+import { getTextColor, shouldShowBorder } from '../utils/colors';
+import { handleNumberInput } from '../utils/forms';
+import { calculatePlayerCorrection } from '../utils/settlement';
 
 interface Props {
   players: Player[];
@@ -15,50 +18,6 @@ interface Props {
   onUpdateTransactions: (transactions: BorrowTransaction[]) => void;
   onCompleteSession: (finalChipsOverride?: Record<string, number>) => void;
   onCancelSession: () => void;
-}
-
-function getTextColor(hexColor: string): string {
-  const r = parseInt(hexColor.slice(1, 3), 16);
-  const g = parseInt(hexColor.slice(3, 5), 16);
-  const b = parseInt(hexColor.slice(5, 7), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#000' : '#fff';
-}
-
-function shouldShowBorder(hexColor: string): boolean {
-  const r = parseInt(hexColor.slice(1, 3), 16);
-  const g = parseInt(hexColor.slice(3, 5), 16);
-  const b = parseInt(hexColor.slice(5, 7), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.85;
-}
-
-// Shared number input handler
-function handleNumberInput(value: string, min: number = 0): number {
-  // Allow empty to be treated as 0 temporarily
-  if (value === '') return 0;
-  const num = parseFloat(value);
-  // Only allow valid positive numbers
-  if (isNaN(num) || num < 0) return min;
-  return num;
-}
-
-function enforceMinimum(value: number, min: number = 0): number {
-  return value < min ? min : value;
-}
-
-// Calculate correction for a player based on borrow transactions
-// If player borrows chips: positive correction (needs more chips to break even)
-// If player lends chips: negative correction (needs fewer chips to break even)
-function calculatePlayerCorrection(playerId: string, transactions: BorrowTransaction[]): number {
-  return transactions.reduce((correction, tx) => {
-    if (tx.borrower === playerId) {
-      return correction + tx.amount; // Borrowed chips (debt)
-    } else if (tx.lender === playerId) {
-      return correction - tx.amount; // Lent chips (credit)
-    }
-    return correction;
-  }, 0);
 }
 
 export function SessionManager({

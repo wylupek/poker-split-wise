@@ -59,7 +59,7 @@ export function calculateMinimalSettlement(players: Player[]): Transaction[] {
  * If player borrows chips: positive correction (they owe, so subtract from P&L)
  * If player lends chips: negative correction (they're owed, so add to P&L)
  */
-function calculatePlayerCorrection(playerId: string, transactions: BorrowTransaction[]): number {
+export function calculatePlayerCorrection(playerId: string, transactions: BorrowTransaction[]): number {
   return transactions.reduce((correction, tx) => {
     if (tx.borrower === playerId) {
       return correction + tx.amount; // Borrowed chips (debt)

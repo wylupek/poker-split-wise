@@ -2,37 +2,12 @@ import { useState, useEffect } from 'react';
 import { Chip, ChipPreset } from '../types';
 import { Settings as SettingsType } from '../utils/storage';
 import { api } from '../utils/api';
+import { getTextColor, shouldShowBorder } from '../utils/colors';
+import { handleNumberInput, enforceMinimum } from '../utils/forms';
 
 interface Props {
   settings: SettingsType;
   onUpdateSettings: (settings: Partial<SettingsType>) => void;
-}
-
-function getTextColor(hexColor: string): string {
-  const r = parseInt(hexColor.slice(1, 3), 16);
-  const g = parseInt(hexColor.slice(3, 5), 16);
-  const b = parseInt(hexColor.slice(5, 7), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#000' : '#fff';
-}
-
-function shouldShowBorder(hexColor: string): boolean {
-  const r = parseInt(hexColor.slice(1, 3), 16);
-  const g = parseInt(hexColor.slice(3, 5), 16);
-  const b = parseInt(hexColor.slice(5, 7), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.85;
-}
-
-function handleNumberInput(value: string, min: number = 1): number {
-  if (value === '') return 0;
-  const num = parseFloat(value);
-  if (isNaN(num) || num < 0) return min;
-  return num;
-}
-
-function enforceMinimum(value: number, min: number = 1): number {
-  return value < min ? min : value;
 }
 
 export function Settings({ settings, onUpdateSettings }: Props) {

@@ -106,13 +106,3 @@ export async function saveSettings(settings: Settings): Promise<boolean> {
     return false;
   }
 }
-
-// Admin
-export async function clearAllData(): Promise<void> {
-  try {
-    await api.post('/settings/clear');
-  } catch (error) {
-    console.error('Error clearing data:', error);
-    throw error;
-  }
-}

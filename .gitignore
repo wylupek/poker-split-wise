@@ -39,3 +39,7 @@ server/node_modules
 *.sw?
 
 TODO.md
+
+# Claude Code artifacts
+.claude/
+.specify/

@@ -1,21 +1,10 @@
-import { GameSession, Player, BorrowTransaction } from '../types';
+import { GameSession, Player } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { calculatePlayerCorrection } from '../utils/settlement';
 
 interface Props {
   sessions: GameSession[];
   players: Player[];
-}
-
-// Calculate correction for a player based on borrow transactions
-function calculatePlayerCorrection(playerId: string, transactions: BorrowTransaction[]): number {
-  return transactions.reduce((correction, tx) => {
-    if (tx.borrower === playerId) {
-      return correction + tx.amount; // Borrowed chips (debt)
-    } else if (tx.lender === playerId) {
-      return correction - tx.amount; // Lent chips (credit)
-    }
-    return correction;
-  }, 0);
 }
 
 interface PlayerStats {

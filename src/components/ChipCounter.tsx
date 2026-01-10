@@ -1,4 +1,5 @@
 import { Chip, ChipCounts } from '../types';
+import { getTextColor, shouldShowBorder } from '../utils/colors';
 
 interface Props {
   chipCounts: ChipCounts;
@@ -6,22 +7,6 @@ interface Props {
   onChipCountChange: (chipId: string, count: number) => void;
   totalValue: number;
   startingChips?: number;
-}
-
-function getTextColor(hexColor: string): string {
-  const r = parseInt(hexColor.slice(1, 3), 16);
-  const g = parseInt(hexColor.slice(3, 5), 16);
-  const b = parseInt(hexColor.slice(5, 7), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#000' : '#fff';
-}
-
-function shouldShowBorder(hexColor: string): boolean {
-  const r = parseInt(hexColor.slice(1, 3), 16);
-  const g = parseInt(hexColor.slice(3, 5), 16);
-  const b = parseInt(hexColor.slice(5, 7), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.85;
 }
 
 export function ChipCounter({ chipCounts, chips, onChipCountChange, totalValue, startingChips = 0 }: Props) {

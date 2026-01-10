@@ -62,19 +62,6 @@ export function useAppState() {
     }
   };
 
-  const updatePlayerBalance = async (playerId: string, amount: number) => {
-    const player = players.find(p => p.id === playerId);
-    if (!player) return;
-
-    const updatedPlayer = { ...player, balance: player.balance + amount };
-    const success = await updatePlayer(updatedPlayer);
-
-    if (success) {
-      setPlayers(players.map(p =>
-        p.id === playerId ? updatedPlayer : p
-      ));
-    }
-  };
 
   // Session management
   const startNewSession = (playerIds: string[], chips: Chip[], conversionRate: number) => {
@@ -265,7 +252,6 @@ export function useAppState() {
     loading,
     addPlayer,
     removePlayer,
-    updatePlayerBalance,
     startNewSession,
     updateSessionPlayerChips,
     updateSessionPlayerChipCounts,
