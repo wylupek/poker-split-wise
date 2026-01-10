@@ -13,6 +13,7 @@ import {
   Settings
 } from '../utils/storage';
 import { calculateSessionResults } from '../utils/settlement';
+import { generateUUID } from '../utils/uuid';
 
 export function useAppState() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -87,7 +88,7 @@ export function useAppState() {
     });
 
     const newSession: GameSession = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       date: new Date().toISOString(),
       conversionRate,
       startingChips: startingChipsPerPlayer,

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Player, GameSession, Chip, BorrowTransaction, ChipPreset } from '../types';
 import { ChipCounter } from './ChipCounter';
 import { api } from '../utils/api';
+import { generateUUID } from '../utils/uuid';
 
 interface Props {
   players: Player[];
@@ -458,7 +459,7 @@ export function SessionManager({
             <button
               onClick={() => {
                 const newTransaction: BorrowTransaction = {
-                  id: crypto.randomUUID(),
+                  id: generateUUID(),
                   lender: 'bank', // Default: Bank lends
                   borrower: currentSession.players[0]?.playerId || 'bank', // to first player
                   amount: 0,
